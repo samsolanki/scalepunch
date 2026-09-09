@@ -34,11 +34,11 @@ fire rate, radius, projectile speed, knockback and hitstop until it is.
 
 **Goal:** the core loop, start to finish, repeatable.
 
-- [ ] XP gems drop on death, magnet pickup, level curve
-- [ ] Level-up pause + 3-card draft UI
-- [ ] `AbilityDefinition` ScriptableObjects; **8 abilities** (4 active, 4 passive)
-- [ ] Target-priority toggle on the HUD (closest / advanced / weakest / toughest)
-- [ ] Ability runtime: cooldowns, levels, stat recalculation
+- [x] XP gems drop on death, magnet pickup, level curve
+- [x] Level-up pause + 3-card draft UI
+- [x] `AbilityDefinition` ScriptableObjects; **8 abilities** (3 active, 5 passive)
+- [x] Target-priority toggle on the HUD (closest / advanced / weakest / toughest)
+- [x] Ability runtime: cooldowns, levels, stat recalculation
 - [ ] Wave timeline from `WaveDefinition`; 8 waves over ~4 min
 - [ ] 4 zombie types (Shambler, Runner, Brute, Spitter — the Spitter needs
       ranged-attack code, the others are stat variants)

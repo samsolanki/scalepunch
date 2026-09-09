@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using ScalePunch.Combat;
 using ScalePunch.Core;
 using ScalePunch.Enemies;
 
@@ -27,7 +28,8 @@ namespace ScalePunch.Weapons
         }
 
         public void Fire(WeaponDefinition weapon, Vector3 origin, Vector3 direction, Enemy target,
-                         float damage, bool isCrit, float speed, int pierce, float range)
+                         float damage, bool isCrit, float speed, int pierce, float range,
+                         Health shooter = null, float lifestealFraction = 0f)
         {
             if (weapon == null || weapon.projectilePrefab == null) return;
 
@@ -50,7 +52,7 @@ namespace ScalePunch.Weapons
 
             round.Launch(origin, direction, target, damage, isCrit, speed,
                          weapon.hitRadius, pierce, range, weapon.lifetime,
-                         weapon.steerDegreesPerSecond);
+                         weapon.steerDegreesPerSecond, shooter, lifestealFraction);
         }
 
         Pool<Projectile> PoolFor(Projectile prefab)

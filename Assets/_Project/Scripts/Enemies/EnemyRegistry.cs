@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -18,6 +19,12 @@ namespace ScalePunch.Enemies
     {
         static readonly List<Enemy> Active = new(256);
 
+        /// <summary>Raised on every kill. Static, so anything in the run can count
+        /// them without holding a reference to each zombie.</summary>
+        public static event Action<Enemy> Killed;
+
+        public static void ReportKill(Enemy enemy) => Killed?.Invoke(enemy);
+
         public static IReadOnlyList<Enemy> All => Active;
         public static int Count => Active.Count;
 
@@ -30,7 +37,11 @@ namespace ScalePunch.Enemies
 
         /// <summary>Scene teardown — statics outlive scene loads, so the Run
         /// scene must clear this or the next run starts with ghosts.</summary>
-        public static void Clear() => Active.Clear();
+        public static void Clear()
+        {
+            Active.Clear();
+            Killed = null;   // statics outlive scene loads; stale subscribers would leak
+        }
 
         public static Enemy FindNearest(Vector3 position, float maxDistance)
         {
@@ -92,6 +103,46 @@ namespace ScalePunch.Enemies
 
             t = abSqr < 0.000001f ? 0f : Mathf.Clamp01(Vector3.Dot(point - a, ab) / abSqr);
             return (point - (a + ab * t)).sqrMagnitude;
+        }
+
+        /// <summary>Non-allocating radius query. Results are appended, not cleared.</summary>
+        public static void FindInRadius(Vector3 origin, float radius, List<Enemy> results)
+        {
+            float radiusSqr = radius * radius;
+
+            for (int i = 0; i < Active.Count; i++)
+            {
+                Enemy e = Active[i];
+                if (e == null || e.IsDead) continue;
+
+                Vector3 delta = e.transform.position - origin;
+                delta.y = 0f;
+                if (delta.sqrMagnitude <= radiusSqr) results.Add(e);
+            }
+        }
+
+        /// <summary>
+        /// Nearest live zombie not already in <paramref name="exclude"/>.
+        /// Used by chaining effects to hop outward without doubling back.
+        /// </summary>
+        public static Enemy FindNearestExcluding(Vector3 position, float maxDistance, List<Enemy> exclude)
+        {
+            float bestSqr = maxDistance * maxDistance;
+            Enemy best = null;
+
+            for (int i = 0; i < Active.Count; i++)
+            {
+                Enemy e = Active[i];
+                if (e == null || e.IsDead) continue;
+                if (exclude != null && exclude.Contains(e)) continue;
+
+                float sqr = (e.transform.position - position).sqrMagnitude;
+                if (sqr >= bestSqr) continue;
+
+                bestSqr = sqr;
+                best = e;
+            }
+            return best;
         }
 
         /// <summary>Non-allocating cone query. Results are appended, not cleared.</summary>

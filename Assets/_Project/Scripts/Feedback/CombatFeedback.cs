@@ -1,5 +1,6 @@
 using UnityEngine;
 using ScalePunch.Combat;
+using ScalePunch.Core;
 using ScalePunch.Data;
 using ScalePunch.Enemies;
 
@@ -62,10 +63,10 @@ namespace ScalePunch.Feedback
                     transform.position - info.Origin,
                     info.IsCrit ? tuning.knockbackCrit : tuning.knockbackNormal);
 
-            if (Hitstop.Exists)
-                Hitstop.Instance.Freeze(killed  ? tuning.hitstopKill
-                                      : info.IsCrit ? tuning.hitstopCrit
-                                                    : tuning.hitstopNormal);
+            if (TimeController.Exists)
+                TimeController.Instance.Freeze(killed  ? tuning.hitstopKill
+                                              : info.IsCrit ? tuning.hitstopCrit
+                                                            : tuning.hitstopNormal);
 
             if (CameraShake.Exists)
                 CameraShake.Instance.Shake(killed  ? tuning.shakeKill

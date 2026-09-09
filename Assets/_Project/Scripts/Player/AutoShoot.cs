@@ -54,6 +54,20 @@ namespace ScalePunch.Player
         [SerializeField] bool drawGizmos = true;
 
         float _cooldown;
+        Health _health;
+
+        /// <summary>Settable at runtime — the HUD toggle drives this.</summary>
+        public TargetPriority Priority
+        {
+            get => priority;
+            set
+            {
+                if (priority == value) return;
+
+                priority = value;
+                CurrentTarget = null;   // re-acquire immediately under the new rule
+            }
+        }
 
         public Enemy CurrentTarget { get; private set; }
         /// <summary>The engagement radius, after weapon multipliers. Read by RangeIndicator.</summary>
@@ -72,6 +86,7 @@ namespace ScalePunch.Player
             if (stats == null) stats = GetComponent<PlayerStats>();
             if (turret == null) turret = transform;
             if (muzzle == null) muzzle = turret;
+            _health = GetComponent<Health>();
         }
 
         void Update()
@@ -179,7 +194,8 @@ namespace ScalePunch.Player
 
                 ProjectileService.Instance.Fire(
                     weapon, origin, SpreadDirection(aim, i, rounds), CurrentTarget,
-                    amount, isCrit, speed, pierce, range);
+                    amount, isCrit, speed, pierce, range,
+                    _health, sheet.Get(StatType.Lifesteal));
             }
 
             if (tuning != null && CameraShake.Exists)

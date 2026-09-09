@@ -23,6 +23,8 @@ namespace ScalePunch.Weapons
         float _steerDegPerSec;
         float _rangeRemaining;
         float _lifeRemaining;
+        float _lifestealFraction;
+        Health _shooter;
         bool _isCrit;
         int _pierceRemaining;
         bool _live;
@@ -34,7 +36,8 @@ namespace ScalePunch.Weapons
 
         public void Launch(Vector3 origin, Vector3 direction, Enemy target,
                            float damage, bool isCrit, float speed, float hitRadius,
-                           int pierce, float range, float lifetime, float steerDegPerSec)
+                           int pierce, float range, float lifetime, float steerDegPerSec,
+                           Health shooter = null, float lifestealFraction = 0f)
         {
             transform.position = origin;
 
@@ -51,6 +54,8 @@ namespace ScalePunch.Weapons
             _rangeRemaining = range;
             _lifeRemaining = lifetime;
             _steerDegPerSec = steerDegPerSec;
+            _shooter = shooter;
+            _lifestealFraction = lifestealFraction;
             _live = true;
 
             _alreadyHit.Clear();
@@ -110,6 +115,11 @@ namespace ScalePunch.Weapons
 
                 _alreadyHit.Add(hit);
                 hit.Health.TakeDamage(new DamageInfo(_damage, _isCrit, from, gameObject));
+
+                // Lifesteal resolves at the point of impact, not the point of
+                // firing — a round in flight has not healed anyone yet.
+                if (_lifestealFraction > 0f && _shooter != null)
+                    _shooter.Heal(_damage * _lifestealFraction);
 
                 if (_pierceRemaining <= 0) { Expire(); return; }
                 _pierceRemaining--;

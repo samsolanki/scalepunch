@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using ScalePunch.Combat;
+using ScalePunch.Progression;
 
 namespace ScalePunch.Enemies
 {
@@ -13,6 +14,7 @@ namespace ScalePunch.Enemies
 
         public EnemyDefinition Definition { get; private set; }
         public Health Health => health;
+        public EnemyMovement Movement => movement;
         public bool IsDead => health.IsDead;
 
         /// <summary>Raised on death so the spawner can pool it. Passed the
@@ -51,7 +53,16 @@ namespace ScalePunch.Enemies
             EnemyRegistry.Register(this);
         }
 
-        void OnDied(DamageInfo info) => Despawn();
+        void OnDied(DamageInfo info)
+        {
+            // Only a kill pays out. Despawn() is also reached by cleanup paths,
+            // and those must not mint XP.
+            if (XPGemService.Exists && Definition != null)
+                XPGemService.Instance.Drop(transform.position, Definition.xpValue);
+
+            EnemyRegistry.ReportKill(this);
+            Despawn();
+        }
 
         public void Despawn()
         {
