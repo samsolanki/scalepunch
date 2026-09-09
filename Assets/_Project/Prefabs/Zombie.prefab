@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: 630060368282572915}
   - component: {fileID: 442011969356450961}
   - component: {fileID: 2942953488504350387}
+  - component: {fileID: 9182469064648167327}
   m_Layer: 0
   m_Name: Zombie
   m_TagString: Untagged
@@ -108,6 +109,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Combat.Health
   maxHP: 100
+  armor: 0
 --- !u!114 &2451725792830794452
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -170,3 +172,20 @@ MonoBehaviour:
   flash: {fileID: 442011969356450961}
   movement: {fileID: 2451725792830794452}
   numberHeight: 1.7
+--- !u!114 &9182469064648167327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6785874861401915935}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62acf74ca9fe60847bf920be4588e169, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Combat.HealthBarTarget
+  health: {fileID: 3015487660837035368}
+  heightOffset: 2.1
+  width: 90
+  hideWhenFull: 1
+  priority: 0

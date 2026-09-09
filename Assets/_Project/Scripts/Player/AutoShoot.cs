@@ -69,6 +69,10 @@ namespace ScalePunch.Player
             }
         }
 
+        /// <summary>Raised once per shot, after the rounds leave the muzzle.
+        /// Muzzle flash and recoil hang off this rather than polling.</summary>
+        public event System.Action Fired;
+
         public Enemy CurrentTarget { get; private set; }
         /// <summary>The engagement radius, after weapon multipliers. Read by RangeIndicator.</summary>
         public float Range => weapon != null ? weapon.RangeFor(stats.Stats) : stats.Get(StatType.Range);
@@ -200,6 +204,8 @@ namespace ScalePunch.Player
 
             if (tuning != null && CameraShake.Exists)
                 CameraShake.Instance.Shake(tuning.shakeOnFire, tuning.shakeOnFireDuration);
+
+            Fired?.Invoke();
         }
 
         int RoundsThisShot(StatSheet sheet)

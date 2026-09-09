@@ -127,14 +127,18 @@ namespace ScalePunch.EditorTools
         static Projectile BuildBullet(MaterialSet mats)
         {
             GameObject go = Primitive(PrimitiveType.Sphere, "Projectile_Bullet", mats.bullet);
-            go.transform.localScale = Vector3.one * 0.18f;
+
+            // Stretched along Z, and Projectile re-aims the transform down its
+            // travel direction every frame, so the round reads as a streak
+            // pointing where it is going rather than as a floating ball.
+            go.transform.localScale = new Vector3(0.09f, 0.09f, 0.44f);
 
             // A tracer is not decoration. At 30 m/s a round crosses the radius in
             // a third of a second; with no trail the player sees no shot at all,
             // only zombies falling over.
             var trail = go.AddComponent<TrailRenderer>();
-            trail.time = 0.09f;
-            trail.startWidth = 0.14f;
+            trail.time = 0.055f;
+            trail.startWidth = 0.10f;
             trail.endWidth = 0f;
             trail.sharedMaterial = mats.line;
             trail.numCapVertices = 2;

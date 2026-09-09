@@ -19,6 +19,7 @@ MonoBehaviour:
   moveSpeed: 1.4
   attackRange: 1.4
   attackInterval: 1
+  armor: 2
   behaviour: 2
   knockbackResistance: 1
   xpValue: 4

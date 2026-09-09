@@ -23,12 +23,16 @@ namespace ScalePunch.Combat
         BaseValue[] baseValues =
         {
             new() { stat = StatType.MaxHP,           value = 100f },
-            new() { stat = StatType.Damage,          value = 10f  },
+            // 5 damage against a 5 HP Shambler is one bullet, one kill - the
+            // clearest possible read on whether the gun is working.
+            new() { stat = StatType.Damage,          value = 5f   },
             new() { stat = StatType.FireRate,        value = 3.0f },
             new() { stat = StatType.Range,           value = 9.0f },
             new() { stat = StatType.CritChance,      value = 0.05f },
             new() { stat = StatType.CritMultiplier,  value = 2.0f },
-            new() { stat = StatType.ProjectileSpeed, value = 30f  },
+            // Fast enough to read as a shot rather than a thrown pebble, slow
+            // enough that the tracer is still visible crossing the ring.
+            new() { stat = StatType.ProjectileSpeed, value = 45f  },
             new() { stat = StatType.ProjectileCount, value = 1f   },
             new() { stat = StatType.Pierce,          value = 0f   },
         };

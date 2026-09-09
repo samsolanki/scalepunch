@@ -16,7 +16,7 @@ namespace ScalePunch.EditorTools
     {
         class MaterialSet
         {
-            public Material ground, turret, shambler, runner, brute, bullet, gem, line;
+            public Material ground, turret, barrel, flash, shambler, runner, brute, bullet, gem, line;
         }
 
         class DataSet
@@ -70,6 +70,8 @@ namespace ScalePunch.EditorTools
         {
             ground   = Mat("M_Ground",    new Color(0.16f, 0.17f, 0.20f), false),
             turret   = Mat("M_Player",    new Color(0.35f, 0.75f, 0.95f), false),
+            barrel   = Mat("M_Barrel",    new Color(0.14f, 0.15f, 0.18f), false),
+            flash    = Mat("M_MuzzleFlash", new Color(1.00f, 0.85f, 0.45f), true),
             shambler = Mat("M_Shambler",  new Color(0.45f, 0.60f, 0.35f), false),
             runner   = Mat("M_Runner",    new Color(0.85f, 0.70f, 0.25f), false),
             brute    = Mat("M_Brute",     new Color(0.70f, 0.25f, 0.25f), false),
@@ -102,8 +104,12 @@ namespace ScalePunch.EditorTools
             set.pistol.projectileSpeedMultiplier = 1f;
             set.pistol.extraProjectiles = 0;
             set.pistol.spreadDegrees = 0f;
-            set.pistol.inaccuracyDegrees = 1.5f;
-            set.pistol.steerDegreesPerSecond = 220f;
+            set.pistol.inaccuracyDegrees = 1.0f;
+
+            // Barely any steering. 220 deg/s let rounds visibly curve after a
+            // target, which reads as a guided missile, not a bullet. Just enough
+            // to correct for a Runner crossing the line of fire.
+            set.pistol.steerDegreesPerSecond = 45f;
 
             set.zombies = BuildZombies();
             set.library = BuildAbilities();
@@ -168,8 +174,11 @@ namespace ScalePunch.EditorTools
         {
             return new[]
             {
-                Zombie("Zombie_Shambler", "shambler", 20f,  8f, 2.5f, 0f, 1, 1.00f, EnemyBehaviour.Shambler),
-                Zombie("Zombie_Runner",   "runner",   10f,  6f, 4.5f, 0f, 1, 0.85f, EnemyBehaviour.Runner),
+                // 5 HP against 5 damage: exactly one bullet per Shambler at
+                // wave 0. That one-shot read is the whole point of the basic
+                // zombie - it is how the player learns the gun works.
+                Zombie("Zombie_Shambler", "shambler",  5f,  8f, 2.5f, 0f, 1, 1.00f, EnemyBehaviour.Shambler),
+                Zombie("Zombie_Runner",   "runner",    5f,  6f, 4.5f, 0f, 1, 0.85f, EnemyBehaviour.Runner),
 
                 // Brutes are knockback-immune. Without that, sustained fire
                 // stunlocks them at the edge of the ring and they stop being a
@@ -177,7 +186,10 @@ namespace ScalePunch.EditorTools
                 // Armour on top of the health pool is what makes a Brute a real
                 // damage check: it punishes many-small-hits builds specifically,
                 // where raw HP just takes longer to chew through.
-                Zombie("Zombie_Brute",    "brute",    90f, 18f, 1.4f, 1f, 4, 1.45f, EnemyBehaviour.Brute, armor: 2f)
+                // Rescaled for 5 damage. Armour dropped to 1: against a 5 damage
+                // bullet, armour 2 was a 40% cut and turned the Brute into a
+                // sponge rather than a check.
+                Zombie("Zombie_Brute",    "brute",    40f, 18f, 1.4f, 1f, 4, 1.45f, EnemyBehaviour.Brute, armor: 1f)
             };
         }
 

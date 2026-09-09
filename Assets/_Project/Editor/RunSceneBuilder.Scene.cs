@@ -96,8 +96,32 @@ namespace ScalePunch.EditorTools
             turret.transform.SetParent(player.transform, false);
             turret.transform.localPosition = new Vector3(0f, 1f, 0f);
 
+            // A capsule is rotationally symmetric, so AutoShoot slewing it to face
+            // a target was completely invisible - the turret was already aiming
+            // correctly and looked identical from every angle. The barrel is what
+            // makes the aim readable.
+            GameObject barrel = Primitive(PrimitiveType.Cube, "Barrel", mats.barrel);
+            barrel.transform.SetParent(turret.transform, false);
+            barrel.transform.localPosition = new Vector3(0f, 0.15f, 0.62f);
+            barrel.transform.localScale = new Vector3(0.16f, 0.16f, 1.05f);
+
             GameObject muzzle = Child("Muzzle", turret.transform);
-            muzzle.transform.localPosition = new Vector3(0f, 0.2f, 0.6f);
+            muzzle.transform.localPosition = new Vector3(0f, 0.15f, 1.16f);
+
+            // Flare sits at the barrel tip and is switched on for a few frames per
+            // shot by MuzzleFlash.
+            GameObject flare = Primitive(PrimitiveType.Sphere, "MuzzleFlash", mats.flash);
+            flare.transform.SetParent(muzzle.transform, false);
+            flare.transform.localScale = Vector3.one * 0.22f;
+
+            var flareLight = flare.AddComponent<Light>();
+            flareLight.type = LightType.Point;
+            flareLight.range = 5f;
+            flareLight.color = new Color(1f, 0.86f, 0.55f);
+            flareLight.intensity = 0f;
+            flareLight.shadows = LightShadows.None;
+
+            var muzzleFlash = flare.AddComponent<MuzzleFlash>();
 
             GameObject ring = Child("RangeRing", player.transform);
             var line = ring.AddComponent<LineRenderer>();
@@ -144,6 +168,10 @@ namespace ScalePunch.EditorTools
 
             Set(indicator, "weapon", weapon);
             Set(indicator, "line", line);
+
+            Set(muzzleFlash, "weapon", weapon);
+            Set(muzzleFlash, "flare", flare.GetComponent<Renderer>());
+            Set(muzzleFlash, "burst", flareLight);
 
             return player;
         }
