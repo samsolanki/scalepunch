@@ -181,7 +181,16 @@ namespace ScalePunch.EditorTools
             var enemy = go.AddComponent<Enemy>();
             var flash = go.AddComponent<HitFlash>();
             var feedback = go.AddComponent<CombatFeedback>();
+            var flinch = go.AddComponent<HitFlinch>();
             var bar = go.AddComponent<HealthBarTarget>();
+
+            // The body, never the root: the root is what aims and walks, and
+            // leaning it would steer the zombie off course.
+            Set(flinch, "health", health);
+            Set(flinch, "body", body.transform);
+            Set(flinch, "tiltDegrees", 24f);
+            Set(flinch, "critTiltDegrees", 38f);
+            Set(flinch, "recoverSpeed", 7f);
 
             Set(bar, "health", health);
             Set(bar, "heightOffset", 2.1f);

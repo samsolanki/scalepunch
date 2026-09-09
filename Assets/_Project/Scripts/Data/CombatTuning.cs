@@ -31,8 +31,8 @@ namespace ScalePunch.Data
         public float shakeOnFireDuration = 0.06f;
 
         [Header("Knockback — bullet impact")]
-        public float knockbackNormal = 1.6f;
-        public float knockbackCrit = 3.2f;
+        public float knockbackNormal = 3.4f;
+        public float knockbackCrit = 6f;
 
         [Header("Hit flash")]
         [Range(0f, 0.5f)] public float flashDuration = 0.08f;

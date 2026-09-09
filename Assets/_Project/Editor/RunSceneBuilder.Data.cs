@@ -123,6 +123,7 @@ namespace ScalePunch.EditorTools
             // finishing, and the only symptom is stale data with a clean log.
             // This line makes which code ran unambiguous.
             Debug.Log($"[ScalePunch] Data written: shambler {set.zombies[0].baseHP} HP, " +
+                      $"runner {set.zombies[1].baseHP} HP, " +
                       $"brute {set.zombies[2].baseHP} HP / armour {set.zombies[2].armor}, " +
                       $"steer {set.pistol.steerDegreesPerSecond} deg/s");
 
@@ -190,7 +191,10 @@ namespace ScalePunch.EditorTools
                 // wave 0. That one-shot read is the whole point of the basic
                 // zombie - it is how the player learns the gun works.
                 Zombie("Zombie_Shambler", "shambler",  5f,  8f, 2.5f, 0f, 1, 1.00f, EnemyBehaviour.Shambler),
-                Zombie("Zombie_Runner",   "runner",    5f,  6f, 4.5f, 0f, 1, 0.85f, EnemyBehaviour.Runner),
+                // Medium tier: two bullets. Fast enough to cross the ring in the
+                // time those two shots take, which is what makes fire rate the
+                // stat that answers it.
+                Zombie("Zombie_Runner",   "runner",   10f,  6f, 4.5f, 0f, 2, 0.85f, EnemyBehaviour.Runner),
 
                 // Brutes are knockback-immune. Without that, sustained fire
                 // stunlocks them at the edge of the ring and they stop being a
