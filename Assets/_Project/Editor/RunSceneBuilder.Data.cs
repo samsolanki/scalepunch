@@ -114,6 +114,14 @@ namespace ScalePunch.EditorTools
             set.zombies = BuildZombies();
             set.library = BuildAbilities();
 
+            // Echo the values actually written. Unity can run a queued menu item
+            // against the pre-reload assembly if it is clicked while a compile is
+            // finishing, and the only symptom is stale data with a clean log.
+            // This line makes which code ran unambiguous.
+            Debug.Log($"[ScalePunch] Data written: shambler {set.zombies[0].baseHP} HP, " +
+                      $"brute {set.zombies[2].baseHP} HP / armour {set.zombies[2].armor}, " +
+                      $"steer {set.pistol.steerDegreesPerSecond} deg/s");
+
             EditorUtility.SetDirty(set.tuning);
             EditorUtility.SetDirty(set.curve);
             EditorUtility.SetDirty(set.pistol);
