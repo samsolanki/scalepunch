@@ -87,15 +87,18 @@ needs to collide with it.
 
 ### Camera
 ```
-Main Camera               (position (0, 16, -11), rotation x=55)
-├─ CameraShake              → Tuning = CombatTuning
-└─ DamageNumberService      → see §5
+CameraRig                 (position (0, 19, -13), rotation x=55)
+└─ Main Camera            (localPosition ZERO, localRotation identity)
+   ├─ CameraShake           → Tuning = CombatTuning
+   └─ DamageNumberService   → see §5
 ```
-The player never moves, so no follow rig is needed — a static camera is correct
-here. `CameraFollow` is still in the repo for later; leave it off the scene.
+The player never moves, so the rig never moves either — but the rig must still
+exist, because shake is applied in local space. `CameraFollow` is in the repo
+for later; leave it off the scene.
 
-`CameraShake` writes `localPosition`, so the camera must be a **root** object
-(or under an unmoving parent) for the numbers in `CombatTuning` to read right.
+`CameraShake` writes `localPosition` and zeroes it when idle, so the camera
+**must** be a child of a positioned rig, at `localPosition` zero. A root camera
+gets snapped to the world origin on the first idle `LateUpdate`.
 
 ### Services
 ```
