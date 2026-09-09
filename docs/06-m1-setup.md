@@ -3,6 +3,13 @@
 Builds on the `Run` scene from [`05-m0-setup.md`](05-m0-setup.md). Same rule as
 before: the scripts are complete, the editor pass is manual.
 
+> **Fast path:** run **ScalePunch ▸ Build Run Scene** from the menu bar. It
+> creates every asset, prefab and GameObject below and wires all ~70 references
+> automatically, then saves the scene to `Assets/_Project/Scenes/Run.unity`.
+> It is re-runnable and preserves asset GUIDs, so rebuild any time something
+> comes unwired. The rest of this document explains what it builds and, more
+> importantly, **what to tune once it runs**.
+
 **What this adds:** zombies drop XP, XP levels you up, a level-up pauses the run
 and offers three cards, and the HUD carries an XP bar plus a target-priority
 toggle. With a stationary player and automatic fire, **the draft is the only

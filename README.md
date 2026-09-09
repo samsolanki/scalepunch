@@ -39,12 +39,19 @@ Engine: Unity 6 LTS, URP, 3D.
 
 ## Start here
 
-1. Create a Unity 6 LTS (3D / URP) project at this repo root so `Assets/` sits
-   beside `docs/`.
-2. Follow [`docs/05-m0-setup.md`](docs/05-m0-setup.md) to build the `Run` scene.
-3. Build to a real phone and tune `CombatTuning` until holding the ring against
+1. Open the project in Unity 6 (URP).
+2. Run **ScalePunch ▸ Build Run Scene** from the menu bar. It generates every
+   material, ScriptableObject, prefab and GameObject and wires all references,
+   then saves `Assets/_Project/Scenes/Run.unity`. TextMeshPro's essential
+   resources are imported automatically on first run.
+3. Press Play.
+4. Build to a real phone and tune `CombatTuning` until holding the ring against
    grey capsules is fun with no art. Nothing later fixes a core loop that fails
-   this test.
+   this test — see [`docs/05-m0-setup.md`](docs/05-m0-setup.md) for the tuning
+   order.
+
+The builder is re-runnable and preserves asset GUIDs, so rebuild whenever
+something comes unwired.
 
 ## Architecture notes
 

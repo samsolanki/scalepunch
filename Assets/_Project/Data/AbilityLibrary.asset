@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afe6b55ef079b054b941cdec36425e20, type: 3}
+  m_Name: AbilityLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Abilities.AbilityLibrary
+  abilities:
+  - {fileID: 11400000, guid: 2f69ad6cd802e24448c1da751e082289, type: 2}
+  - {fileID: 11400000, guid: 3af8cf0854e612649b610425ce4db387, type: 2}
+  - {fileID: 11400000, guid: 6aa9d5478ed15e240b3fbc2019ce91fb, type: 2}
+  - {fileID: 11400000, guid: 0596111985240524b908c02c5bf36a10, type: 2}
+  - {fileID: 11400000, guid: dbf5a580eab0d0b43a13c121215528cf, type: 2}
+  - {fileID: 11400000, guid: e16a233b0ca37be4cab5a06d569ff040, type: 2}
+  - {fileID: 11400000, guid: dd3256de9b3a6b94aac7d22e62371e55, type: 2}
+  - {fileID: 11400000, guid: f944a333d1f81d448a4bee30a2ef2e3b, type: 2}
+  fallback: {fileID: 11400000, guid: b596d504f1b1a2047a67adfed58bbb2d, type: 2}
+  maxDistinctAbilities: 6

@@ -114,6 +114,28 @@ namespace ScalePunch.EditorTools
             return set;
         }
 
+        static T LoadData<T>(string file) where T : ScriptableObject
+            => AssetDatabase.LoadAssetAtPath<T>($"{DataDir}/{file}.asset");
+
+        /// <summary>
+        /// Re-resolves every data asset from disk. Asset references do not survive
+        /// a reimport, so anything held across one has to be looked up again.
+        /// </summary>
+        static void Reacquire(DataSet set)
+        {
+            set.tuning = LoadData<CombatTuning>("CombatTuning");
+            set.curve = LoadData<LevelCurve>("LevelCurve");
+            set.pistol = LoadData<WeaponDefinition>("Weapon_Pistol");
+            set.library = LoadData<AbilityLibrary>("AbilityLibrary");
+
+            set.zombies = new[]
+            {
+                LoadData<EnemyDefinition>("Zombie_Shambler"),
+                LoadData<EnemyDefinition>("Zombie_Runner"),
+                LoadData<EnemyDefinition>("Zombie_Brute")
+            };
+        }
+
         static EnemyDefinition Zombie(string file, string id, float hp, float damage,
                                       float speed, float knockbackResist, int xp,
                                       float scale, EnemyBehaviour behaviour)

@@ -68,8 +68,19 @@ namespace ScalePunch.EditorTools
             var data = BuildData();
             var prefabs = BuildPrefabs(data, mats);
 
+            // Persist before the scene references any of this.
+            //
+            // Deliberately NO AssetDatabase.Refresh() here: a refresh reimports
+            // the assets just created, which destroys the managed objects still
+            // held in `data` and `prefabs`. Every one of them then throws
+            // MissingReferenceException the moment BuildScene touches it.
             AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+
+            // Re-resolve from disk regardless, so an import triggered from
+            // anywhere else cannot leave stale references being wired into the
+            // scene.
+            Reacquire(data);
+            Reacquire(prefabs);
 
             BuildScene(data, prefabs, mats);
 
@@ -166,7 +177,7 @@ namespace ScalePunch.EditorTools
         {
             if (AssetDatabase.IsValidFolder(path)) return;
 
-            string parent = Path.GetDirectoryName(path).Replace('\', '/');
+            string parent = Path.GetDirectoryName(path).Replace(Path.DirectorySeparatorChar, '/');
             string leaf = Path.GetFileName(path);
 
             EnsureFolder(parent);

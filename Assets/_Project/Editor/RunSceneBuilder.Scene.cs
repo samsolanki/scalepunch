@@ -372,6 +372,13 @@ namespace ScalePunch.EditorTools
             layout.childControlWidth = false;
             layout.childControlHeight = false;
 
+            if (prefabs.draftCard == null)
+            {
+                Debug.LogError("[ScalePunch] DraftCard prefab is missing; the draft UI was not built. " +
+                               "Re-run ScalePunch ▸ Build Run Scene.");
+                return;
+            }
+
             var cards = new Object[3];
             for (int i = 0; i < 3; i++)
             {

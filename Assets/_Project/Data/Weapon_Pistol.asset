@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1998af8ee598534fa2a2eae4b28ae75, type: 3}
+  m_Name: Weapon_Pistol
+  m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Weapons.WeaponDefinition
+  id: pistol
+  displayName: Pistol
+  projectilePrefab: {fileID: 4985256397632180213, guid: 4b84a18cc8fa62d4ba4b5b7f68919b70, type: 3}
+  hitRadius: 0.35
+  lifetime: 2.5
+  damageMultiplier: 1
+  fireRateMultiplier: 1
+  rangeMultiplier: 1
+  projectileSpeedMultiplier: 1
+  extraProjectiles: 0
+  spreadDegrees: 0
+  inaccuracyDegrees: 1.5
+  steerDegreesPerSecond: 220

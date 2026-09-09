@@ -26,6 +26,18 @@ namespace ScalePunch.EditorTools
         }
 
         /// <summary>
+        /// UI child. A plain `new GameObject` gets a Transform, and Transform does
+        /// not cast to RectTransform - the RectTransform has to be requested at
+        /// construction, before anything tries to lay the object out.
+        /// </summary>
+        static RectTransform UIChild(string name, Transform parent)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            return (RectTransform)go.transform;
+        }
+
+        /// <summary>
         /// Saves and destroys the temporary instance. Every field is wired on the
         /// temp object BEFORE this is called - editing a saved prefab asset
         /// afterwards needs a separate save round-trip and is easy to get wrong.
@@ -63,6 +75,25 @@ namespace ScalePunch.EditorTools
             text.color = colour;
             text.raycastTarget = false;
             return text;
+        }
+
+        static Sprite UiSprite() =>
+            AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+
+        static T LoadPrefab<T>(string file) where T : Component
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabDir}/{file}.prefab");
+            return go != null ? go.GetComponent<T>() : null;
+        }
+
+        /// <summary>See Reacquire(DataSet) - same reason, same fix.</summary>
+        static void Reacquire(PrefabSet set)
+        {
+            set.bullet = LoadPrefab<Projectile>("Projectile_Bullet");
+            set.gem = LoadPrefab<XPGem>("XPGem");
+            set.zombie = LoadPrefab<Enemy>("Zombie");
+            set.damageNumber = LoadPrefab<DamageNumber>("DamageNumber");
+            set.draftCard = LoadPrefab<DraftCard>("DraftCard");
         }
 
         static PrefabSet BuildPrefabs(DataSet data, MaterialSet mats)
@@ -171,7 +202,7 @@ namespace ScalePunch.EditorTools
 
             var background = root.AddComponent<Image>();
             background.color = new Color(0.13f, 0.14f, 0.18f, 0.98f);
-            background.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            background.sprite = UiSprite();
             background.type = Image.Type.Sliced;
 
             var button = root.AddComponent<Button>();
@@ -183,55 +214,50 @@ namespace ScalePunch.EditorTools
 
             // A colour stripe along the top edge is the fastest read of active vs
             // passive, which is the first thing a player sorts three cards by.
-            GameObject stripeGo = Child("KindStripe", root.transform);
-            var stripeRect = (RectTransform)stripeGo.transform;
+            RectTransform stripeRect = UIChild("KindStripe", root.transform);
             stripeRect.anchorMin = new Vector2(0f, 1f);
             stripeRect.anchorMax = new Vector2(1f, 1f);
             stripeRect.pivot = new Vector2(0.5f, 1f);
             stripeRect.anchoredPosition = Vector2.zero;
             stripeRect.sizeDelta = new Vector2(0f, 12f);
-            var stripe = stripeGo.AddComponent<Image>();
+            var stripe = stripeRect.gameObject.AddComponent<Image>();
             stripe.raycastTarget = false;
 
-            GameObject iconGo = Child("Icon", root.transform);
-            var iconRect = (RectTransform)iconGo.transform;
+            RectTransform iconRect = UIChild("Icon", root.transform);
             iconRect.anchorMin = new Vector2(0.5f, 1f);
             iconRect.anchorMax = new Vector2(0.5f, 1f);
             iconRect.pivot = new Vector2(0.5f, 1f);
             iconRect.anchoredPosition = new Vector2(0f, -36f);
             iconRect.sizeDelta = new Vector2(110f, 110f);
-            var icon = iconGo.AddComponent<Image>();
+            var icon = iconRect.gameObject.AddComponent<Image>();
             icon.raycastTarget = false;
             icon.enabled = false;   // DraftCard re-enables it only when the ability has a sprite
 
-            GameObject nameGo = Child("NameLabel", root.transform);
-            var nameRect = (RectTransform)nameGo.transform;
+            RectTransform nameRect = UIChild("NameLabel", root.transform);
             nameRect.anchorMin = new Vector2(0f, 1f);
             nameRect.anchorMax = new Vector2(1f, 1f);
             nameRect.pivot = new Vector2(0.5f, 1f);
             nameRect.anchoredPosition = new Vector2(0f, -160f);
             nameRect.sizeDelta = new Vector2(-30f, 50f);
-            TextMeshProUGUI nameLabel = Label(nameGo, 30f, TextAlignmentOptions.Center, Color.white);
+            TextMeshProUGUI nameLabel = Label(nameRect.gameObject, 30f, TextAlignmentOptions.Center, Color.white);
             nameLabel.fontStyle = FontStyles.Bold;
 
-            GameObject levelGo = Child("LevelLabel", root.transform);
-            var levelRect = (RectTransform)levelGo.transform;
+            RectTransform levelRect = UIChild("LevelLabel", root.transform);
             levelRect.anchorMin = new Vector2(0f, 1f);
             levelRect.anchorMax = new Vector2(1f, 1f);
             levelRect.pivot = new Vector2(0.5f, 1f);
             levelRect.anchoredPosition = new Vector2(0f, -212f);
             levelRect.sizeDelta = new Vector2(-30f, 36f);
-            TextMeshProUGUI levelLabel = Label(levelGo, 24f, TextAlignmentOptions.Center,
+            TextMeshProUGUI levelLabel = Label(levelRect.gameObject, 24f, TextAlignmentOptions.Center,
                                                new Color(0.65f, 0.72f, 0.80f));
 
-            GameObject descGo = Child("DescriptionLabel", root.transform);
-            var descRect = (RectTransform)descGo.transform;
+            RectTransform descRect = UIChild("DescriptionLabel", root.transform);
             descRect.anchorMin = Vector2.zero;
             descRect.anchorMax = new Vector2(1f, 0f);
             descRect.pivot = new Vector2(0.5f, 0f);
             descRect.anchoredPosition = new Vector2(0f, 26f);
             descRect.sizeDelta = new Vector2(-40f, 140f);
-            TextMeshProUGUI descLabel = Label(descGo, 24f, TextAlignmentOptions.Top,
+            TextMeshProUGUI descLabel = Label(descRect.gameObject, 24f, TextAlignmentOptions.Top,
                                               new Color(0.85f, 0.88f, 0.92f));
 
             var card = root.AddComponent<DraftCard>();

@@ -4,6 +4,13 @@ The scripts in `Assets/_Project/Scripts/` are complete but inert. Unity scenes
 and prefabs are editor-authored YAML that cannot sensibly be hand-written, so
 this is the ~30-minute manual pass that turns the code into a playable build.
 
+> **Fast path:** run **ScalePunch ▸ Build Run Scene** from the menu bar. It
+> creates every asset, prefab and GameObject below and wires all ~70 references
+> automatically, then saves the scene to `Assets/_Project/Scenes/Run.unity`.
+> It is re-runnable and preserves asset GUIDs, so rebuild any time something
+> comes unwired. The rest of this document explains what it builds and, more
+> importantly, **what to tune once it runs**.
+
 **What M0 is:** a stationary survivor with an engagement radius drawn on the
 ground. Zombies converge from all directions; anything crossing the ring is
 acquired and shot automatically. No movement, no joystick, no fire button.
