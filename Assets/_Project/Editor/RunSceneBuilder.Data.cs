@@ -144,7 +144,7 @@ namespace ScalePunch.EditorTools
 
         static EnemyDefinition Zombie(string file, string id, float hp, float damage,
                                       float speed, float knockbackResist, int xp,
-                                      float scale, EnemyBehaviour behaviour)
+                                      float scale, EnemyBehaviour behaviour, float armor = 0f)
         {
             EnemyDefinition def = Asset<EnemyDefinition>(file);
 
@@ -156,6 +156,7 @@ namespace ScalePunch.EditorTools
             def.attackInterval = 1.0f;
             def.behaviour = behaviour;
             def.knockbackResistance = knockbackResist;
+            def.armor = armor;
             def.xpValue = xp;
             def.scale = scale;
 
@@ -173,7 +174,10 @@ namespace ScalePunch.EditorTools
                 // Brutes are knockback-immune. Without that, sustained fire
                 // stunlocks them at the edge of the ring and they stop being a
                 // DPS check at all.
-                Zombie("Zombie_Brute",    "brute",    90f, 18f, 1.4f, 1f, 4, 1.45f, EnemyBehaviour.Brute)
+                // Armour on top of the health pool is what makes a Brute a real
+                // damage check: it punishes many-small-hits builds specifically,
+                // where raw HP just takes longer to chew through.
+                Zombie("Zombie_Brute",    "brute",    90f, 18f, 1.4f, 1f, 4, 1.45f, EnemyBehaviour.Brute, armor: 2f)
             };
         }
 

@@ -17,5 +17,12 @@ namespace ScalePunch.Combat
             Origin = origin;
             Source = source;
         }
+
+        /// <summary>
+        /// Same blow, different number. Health uses this to re-report the damage
+        /// it actually applied after armour, so the floating number matches the
+        /// HP that was really lost instead of the raw roll.
+        /// </summary>
+        public DamageInfo WithAmount(float amount) => new DamageInfo(amount, IsCrit, Origin, Source);
     }
 }

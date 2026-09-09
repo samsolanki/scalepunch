@@ -25,13 +25,15 @@ namespace ScalePunch.Player
         {
             if (health == null) health = GetComponent<Health>();
             stats.Changed += SyncHealth;
-            health.Init(stats.Get(StatType.MaxHP));
+            health.Init(stats.Get(StatType.MaxHP), stats.Get(StatType.Armor));
         }
 
         void OnDestroy() => stats.Changed -= SyncHealth;
 
         void SyncHealth()
         {
+            SyncArmor();
+
             float newMax = stats.Get(StatType.MaxHP);
             float gained = newMax - health.Max;
             if (Mathf.Approximately(gained, 0f)) return;
@@ -40,6 +42,13 @@ namespace ScalePunch.Player
             // lowers the ceiling.
             health.SetMax(newMax, Mathf.Max(0f, gained));
         }
+
+        /// <summary>
+        /// Armour is a stat like any other, so gear and abilities that raise it
+        /// have to reach Health. Without this it stays whatever it was at spawn
+        /// and every +armour upgrade does nothing.
+        /// </summary>
+        void SyncArmor() => health.SetArmor(stats.Get(StatType.Armor));
 
         public float Get(StatType stat) => stats.Get(stat);
     }

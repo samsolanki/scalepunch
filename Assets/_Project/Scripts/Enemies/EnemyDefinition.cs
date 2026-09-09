@@ -27,6 +27,11 @@ namespace ScalePunch.Enemies
         public float attackRange = 1.2f;
         public float attackInterval = 1.0f;
 
+        [Tooltip("Flat damage reduction per hit. This is what makes a Brute a real " +
+                 "damage check rather than just a big health pool: armour punishes " +
+                 "many-small-hits builds specifically.")]
+        public float armor;
+
         [Header("Behaviour")]
         public EnemyBehaviour behaviour = EnemyBehaviour.Shambler;
         [Tooltip("1 = immune. Brutes should ignore bullet knockback entirely, or " +

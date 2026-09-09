@@ -40,11 +40,13 @@ namespace ScalePunch.EditorTools
 
             Camera camera = BuildCamera(data);
 
-            Canvas canvas = BuildCanvas(out RectTransform damageNumberRoot);
+            Canvas canvas = BuildCanvas(out RectTransform damageNumberRoot,
+                                        out RectTransform healthBarRoot);
             BuildHUD(canvas, levels, health, weapon);
             BuildDraftUI(canvas, draft, abilities, prefabs);
 
-            BuildSystems(data, prefabs, player.transform, stats, levels, camera, damageNumberRoot);
+            BuildSystems(data, prefabs, player.transform, stats, levels, camera,
+                         damageNumberRoot, healthBarRoot);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -109,6 +111,15 @@ namespace ScalePunch.EditorTools
             line.endColor = line.startColor;
 
             var indicator = ring.AddComponent<RangeIndicator>();
+
+            // The same component zombies use. The HUD bar is for glancing at;
+            // this one is where the player's eyes already are when they get hit.
+            var bar = player.AddComponent<HealthBarTarget>();
+            Set(bar, "health", health);
+            Set(bar, "heightOffset", 2.7f);
+            Set(bar, "width", 130f);
+            Set(bar, "hideWhenFull", true);
+            Set(bar, "priority", 10);
 
             Set(health, "maxHP", 100f);
 
@@ -191,7 +202,8 @@ namespace ScalePunch.EditorTools
             return rect;
         }
 
-        static Canvas BuildCanvas(out RectTransform damageNumberRoot)
+        static Canvas BuildCanvas(out RectTransform damageNumberRoot,
+                                  out RectTransform healthBarRoot)
         {
             var canvasGo = new GameObject("Canvas", typeof(RectTransform));
             var canvas = canvasGo.AddComponent<Canvas>();
@@ -203,6 +215,13 @@ namespace ScalePunch.EditorTools
             scaler.matchWidthOrHeight = 0.5f;
 
             canvasGo.AddComponent<GraphicRaycaster>();
+
+            // Health bars are created first so they sit UNDER the damage
+            // numbers in the draw order - a number hidden behind a bar is the
+            // one piece of feedback the player is actually reading.
+            var bars = new GameObject("HealthBars", typeof(RectTransform));
+            bars.transform.SetParent(canvasGo.transform, false);
+            healthBarRoot = Stretch((RectTransform)bars.transform);
 
             var numbers = new GameObject("DamageNumbers", typeof(RectTransform));
             numbers.transform.SetParent(canvasGo.transform, false);
@@ -405,7 +424,7 @@ namespace ScalePunch.EditorTools
 
         static void BuildSystems(DataSet data, PrefabSet prefabs, Transform player,
                                  PlayerStats stats, LevelSystem levels, Camera camera,
-                                 RectTransform damageNumberRoot)
+                                 RectTransform damageNumberRoot, RectTransform healthBarRoot)
         {
             var systems = new GameObject("Systems");
 
@@ -442,6 +461,12 @@ namespace ScalePunch.EditorTools
             Set(numbers, "canvasRoot", damageNumberRoot);
             Set(numbers, "worldCamera", camera);
             Set(numbers, "maxConcurrent", 40);
+
+            var bars = camera.gameObject.AddComponent<HealthBarService>();
+            Set(bars, "prefab", prefabs.healthBar);
+            Set(bars, "canvasRoot", healthBarRoot);
+            Set(bars, "worldCamera", camera);
+            Set(bars, "maxConcurrent", 24);
         }
 
         static void RegisterInBuildSettings()

@@ -23,6 +23,7 @@ namespace ScalePunch.EditorTools
             public Enemy zombie;
             public DamageNumber damageNumber;
             public DraftCard draftCard;
+            public HealthBarWidget healthBar;
         }
 
         /// <summary>
@@ -94,6 +95,7 @@ namespace ScalePunch.EditorTools
             set.zombie = Keep(LoadPrefab<Enemy>("Zombie"), set.zombie);
             set.damageNumber = Keep(LoadPrefab<DamageNumber>("DamageNumber"), set.damageNumber);
             set.draftCard = Keep(LoadPrefab<DraftCard>("DraftCard"), set.draftCard);
+            set.healthBar = Keep(LoadPrefab<HealthBarWidget>("HealthBar"), set.healthBar);
         }
 
         static PrefabSet BuildPrefabs(DataSet data, MaterialSet mats)
@@ -104,7 +106,8 @@ namespace ScalePunch.EditorTools
                 gem = BuildGem(mats),
                 zombie = BuildZombiePrefab(data, mats),
                 damageNumber = BuildDamageNumber(),
-                draftCard = BuildDraftCard()
+                draftCard = BuildDraftCard(),
+                healthBar = BuildHealthBar()
             };
 
             // All three zombie definitions share one prefab - they differ by stats
@@ -165,6 +168,13 @@ namespace ScalePunch.EditorTools
             var enemy = go.AddComponent<Enemy>();
             var flash = go.AddComponent<HitFlash>();
             var feedback = go.AddComponent<CombatFeedback>();
+            var bar = go.AddComponent<HealthBarTarget>();
+
+            Set(bar, "health", health);
+            Set(bar, "heightOffset", 2.1f);
+            Set(bar, "width", 90f);
+            Set(bar, "hideWhenFull", true);
+            Set(bar, "priority", 0);
 
             Set(enemy, "health", health);
             Set(enemy, "movement", movement);
@@ -193,6 +203,46 @@ namespace ScalePunch.EditorTools
             Set(number, "label", text);
 
             return SavePrefab<DamageNumber>(go, "DamageNumber");
+        }
+
+        static HealthBarWidget BuildHealthBar()
+        {
+            var root = new GameObject("HealthBar", typeof(RectTransform), typeof(CanvasGroup));
+            var rect = (RectTransform)root.transform;
+            rect.sizeDelta = new Vector2(90f, 10f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+
+            RectTransform backRect = UIChild("Background", root.transform);
+            Stretch(backRect);
+            var back = backRect.gameObject.AddComponent<Image>();
+            back.sprite = UiSprite();
+            back.type = Image.Type.Sliced;
+            back.color = new Color(0.05f, 0.06f, 0.08f, 0.85f);
+            back.raycastTarget = false;
+
+            RectTransform fillRect = UIChild("Fill", root.transform);
+            Stretch(fillRect);
+            // A 2px inset so the dark background reads as an outline rather than
+            // the fill sitting flush against the edge.
+            fillRect.offsetMin = new Vector2(2f, 2f);
+            fillRect.offsetMax = new Vector2(-2f, -2f);
+
+            var fill = fillRect.gameObject.AddComponent<Image>();
+            fill.sprite = UiSprite();
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            fill.fillAmount = 1f;
+            fill.color = new Color(0.35f, 0.85f, 0.4f);
+            fill.raycastTarget = false;
+
+            var widget = root.AddComponent<HealthBarWidget>();
+            Set(widget, "root", rect);
+            Set(widget, "background", back);
+            Set(widget, "fill", fill);
+            Set(widget, "group", root.GetComponent<CanvasGroup>());
+
+            return SavePrefab<HealthBarWidget>(root, "HealthBar");
         }
 
         static DraftCard BuildDraftCard()

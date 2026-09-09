@@ -345,6 +345,7 @@ namespace ScalePunch.EditorTools
             Check(prefabs.zombie, "Zombie prefab");
             Check(prefabs.damageNumber, "DamageNumber prefab");
             Check(prefabs.draftCard, "DraftCard prefab");
+            Check(prefabs.healthBar, "HealthBar prefab");
 
             if (missing.Count == 0) return true;
 

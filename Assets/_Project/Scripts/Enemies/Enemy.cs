@@ -45,7 +45,7 @@ namespace ScalePunch.Enemies
         {
             Definition = definition;
 
-            health.Init(definition.HPAtWave(wave, stageMultiplier));
+            health.Init(definition.HPAtWave(wave, stageMultiplier), definition.armor);
             movement.Configure(definition, definition.DamageAtWave(wave, stageMultiplier), target);
 
             transform.localScale = Vector3.one * definition.scale;
