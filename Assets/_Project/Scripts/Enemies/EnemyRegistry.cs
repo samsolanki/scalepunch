@@ -96,8 +96,20 @@ namespace ScalePunch.Enemies
 
         /// <summary>Squared distance from a point to a segment, with the
         /// normalised position along that segment of the closest point.</summary>
+        /// <summary>
+        /// Distance measured on the ground plane only.
+        ///
+        /// Height is decorative in a top-down game and must not be part of hit
+        /// detection: rounds leave the muzzle around head height while a zombie's
+        /// transform sits on the floor, so a 3D measurement is never smaller than
+        /// that vertical gap and nothing can ever be hit.
+        /// </summary>
         static float SqrDistanceToSegment(Vector3 point, Vector3 a, Vector3 b, out float t)
         {
+            point.y = 0f;
+            a.y = 0f;
+            b.y = 0f;
+
             Vector3 ab = b - a;
             float abSqr = ab.sqrMagnitude;
 

@@ -163,7 +163,16 @@ namespace ScalePunch.EditorTools
 
         static Enemy BuildZombiePrefab(DataSet data, MaterialSet mats)
         {
-            GameObject go = Primitive(PrimitiveType.Capsule, "Zombie", mats.shambler);
+            // Root at ground level with the body as a raised child, exactly like
+            // the player's turret. A bare capsule as the root sits centred on its
+            // own origin, so spawning it at ground level buried half the zombie
+            // below the floor - and put its transform a metre away from where the
+            // bullets actually fly.
+            var go = new GameObject("Zombie");
+
+            GameObject body = Primitive(PrimitiveType.Capsule, "Body", mats.shambler);
+            body.transform.SetParent(go.transform, false);
+            body.transform.localPosition = new Vector3(0f, 1f, 0f);
 
             // Order matters: Enemy declares [RequireComponent] for Health and
             // EnemyMovement, so adding it first would auto-add them unwired.
@@ -184,7 +193,7 @@ namespace ScalePunch.EditorTools
             Set(enemy, "movement", movement);
 
             Set(flash, "tuning", data.tuning);
-            SetArray(flash, "renderers", new Object[] { go.GetComponent<Renderer>() });
+            SetArray(flash, "renderers", new Object[] { body.GetComponent<Renderer>() });
 
             Set(feedback, "tuning", data.tuning);
             Set(feedback, "health", health);
