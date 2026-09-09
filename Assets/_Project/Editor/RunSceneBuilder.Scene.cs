@@ -25,10 +25,13 @@ namespace ScalePunch.EditorTools
     {
         const float SpawnRadius = 16f;
 
-        static void BuildScene(DataSet data, PrefabSet prefabs, MaterialSet mats)
+        /// <summary>
+        /// Populates a scene that Build() has already created. The scene is NOT
+        /// created here: doing so would unload every asset loaded before this
+        /// call, and they would all wire into the scene as null.
+        /// </summary>
+        static void BuildScene(Scene scene, DataSet data, PrefabSet prefabs, MaterialSet mats)
         {
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-
             BuildEnvironment(mats);
 
             GameObject player = BuildPlayer(data, mats, out AutoShoot weapon, out PlayerStats stats,

@@ -78,6 +78,17 @@ namespace ScalePunch.EditorTools
 
             Debug.Log("[ScalePunch] Building Run scene…");
 
+            // The scene swap MUST happen before anything is loaded or created.
+            //
+            // EditorSceneManager.NewScene in Single mode unloads assets the
+            // incoming scene does not yet reference, which silently destroys
+            // every ScriptableObject and prefab loaded before it. Those then
+            // serialise into the new scene as null - a scene that loads, runs,
+            // and does nothing. Scene-to-scene references were always fine
+            // because those objects are created after the swap.
+            UnityEngine.SceneManagement.Scene scene =
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
             try
             {
                 AssetDatabase.StartAssetEditing();
@@ -111,7 +122,7 @@ namespace ScalePunch.EditorTools
 
             if (!Validate(data, prefabs)) return;
 
-            BuildScene(data, prefabs, mats);
+            BuildScene(scene, data, prefabs, mats);
 
             // Trust nothing: confirm the scene actually landed on disk rather
             // than reporting success because no exception happened to be thrown.
