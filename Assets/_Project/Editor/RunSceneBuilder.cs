@@ -47,9 +47,36 @@ namespace ScalePunch.EditorTools
         [MenuItem("ScalePunch/Build Run Scene", false, 0)]
         public static void Build()
         {
+            // Every abort below says why. An earlier version returned silently
+            // when the save prompt was cancelled, which looked identical to the
+            // menu item doing nothing at all.
+
+            if (EditorApplication.isPlaying)
+            {
+                Debug.LogError("[ScalePunch] Stop Play mode first — the scene cannot be " +
+                               "rebuilt while the game is running. Press Stop, then run " +
+                               "ScalePunch ▸ Build Run Scene again.");
+                return;
+            }
+
             if (!EnsureTextMeshPro()) return;
 
-            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            // An untitled scene has never been saved, and in this project that is
+            // almost always this builder's own debris from a failed run. Prompting
+            // to save it only puts a Cancel button in front of the build - and
+            // Cancel aborts everything. Only prompt for a scene that exists on disk.
+            UnityEngine.SceneManagement.Scene current = EditorSceneManager.GetActiveScene();
+
+            if (!string.IsNullOrEmpty(current.path) &&
+                !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
+                Debug.LogWarning("[ScalePunch] Build cancelled at the \"save current scene\" prompt " +
+                                 "— nothing was built. Re-run and choose Save or Don't Save; " +
+                                 "Cancel aborts the whole build.");
+                return;
+            }
+
+            Debug.Log("[ScalePunch] Building Run scene…");
 
             try
             {
@@ -84,8 +111,18 @@ namespace ScalePunch.EditorTools
 
             BuildScene(data, prefabs, mats);
 
-            Debug.Log("<b>[ScalePunch]</b> Run scene built at " + ScenePath +
-                      ". Press Play. Tune CombatTuning and the player's StatSheet from the inspector.");
+            // Trust nothing: confirm the scene actually landed on disk rather
+            // than reporting success because no exception happened to be thrown.
+            AssetDatabase.SaveAssets();
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+            {
+                Debug.LogError($"[ScalePunch] Build finished but no scene exists at {ScenePath}. " +
+                               "Check the console above for the first error.");
+                return;
+            }
+
+            Debug.Log($"<b>[ScalePunch]</b> Run scene built at {ScenePath}. Open it and press Play. " +
+                      "Tune CombatTuning and the player's StatSheet from the inspector.");
         }
 
         // ------------------------------------------------------------------ TMP
