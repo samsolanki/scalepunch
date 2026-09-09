@@ -29,6 +29,7 @@ Engine: Unity 6 LTS, URP, 3D.
 
 | Doc | Contents |
 |---|---|
+| [`docs/00-current-state.md`](docs/00-current-state.md) | **Start here.** What is built vs designed vs not planned, system by system |
 | [`docs/01-game-design.md`](docs/01-game-design.md) | Core loop, combat feel, stats and formulas, abilities and evolutions, enemies, gear, base rooms, economy, pacing targets |
 | [`docs/02-tech-stack.md`](docs/02-tech-stack.md) | Engine choice and rationale, SDKs, data-driven architecture, project layout, mobile performance rules, save format |
 | [`docs/03-roadmap.md`](docs/03-roadmap.md) | Milestones M0–M6 with exit criteria and realistic timings |
