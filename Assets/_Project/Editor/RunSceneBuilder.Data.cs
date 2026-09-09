@@ -202,10 +202,13 @@ namespace ScalePunch.EditorTools
                 // Armour on top of the health pool is what makes a Brute a real
                 // damage check: it punishes many-small-hits builds specifically,
                 // where raw HP just takes longer to chew through.
-                // Rescaled for 5 damage. Armour dropped to 1: against a 5 damage
-                // bullet, armour 2 was a 40% cut and turned the Brute into a
-                // sponge rather than a check.
-                Zombie("Zombie_Brute",    "brute",    40f, 18f, 1.4f, 1f, 4, 1.45f, EnemyBehaviour.Brute, armor: 1f)
+                // Big tier: 10 HP, two bullets, and armour 0 on purpose.
+                //
+                // Armour and "dies in exactly N bullets" pull against each other -
+                // with armour 1 a 5 damage round only lands 4, so 10 HP would take
+                // three shots, not two. Anything that must die in a countable
+                // number of hits has to have no armour at all.
+                Zombie("Zombie_Brute",    "brute",    10f, 18f, 1.4f, 1f, 4, 1.45f, EnemyBehaviour.Brute, armor: 0f)
             };
         }
 
