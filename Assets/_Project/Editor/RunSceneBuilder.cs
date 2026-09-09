@@ -337,10 +337,12 @@ namespace ScalePunch.EditorTools
 
             if (missing.Count == 0) return true;
 
-            Debug.LogError("[ScalePunch] Aborting: these references are null, so the scene " +
-                           "would build but do nothing.
-  " + string.Join("
-  ", missing));
+            string list = string.Join(System.Environment.NewLine + "  ", missing);
+
+            Debug.LogError("[ScalePunch] Aborting: these references are null, so the "
+                           + "scene would build but do nothing."
+                           + System.Environment.NewLine + "  " + list);
+
             return false;
         }
 
