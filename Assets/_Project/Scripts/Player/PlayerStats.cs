@@ -7,6 +7,9 @@ namespace ScalePunch.Player
     /// Owns the player's StatSheet and keeps Health's maximum in sync with it,
     /// so a +MaxHP ability at M1 raises current HP too rather than silently
     /// doing nothing.
+    ///
+    /// The player is a fixed emplacement — it never moves — so this is the only
+    /// thing standing between the stat sheet and the weapon.
     /// </summary>
     [RequireComponent(typeof(Health))]
     public class PlayerStats : MonoBehaviour

@@ -2,7 +2,12 @@ using UnityEngine;
 
 namespace ScalePunch.Enemies
 {
-    public enum EnemyBehaviour { Chase, Runner, Brute }
+    /// <summary>
+    /// Authoring intent. At M0 every zombie walks straight at the player and
+    /// they differ only by stats — which is genuinely all Shambler, Runner and
+    /// Brute need. Spitter needs ranged attack code and lands at M1.
+    /// </summary>
+    public enum EnemyBehaviour { Shambler, Runner, Brute, Spitter }
 
     /// <summary>
     /// Enemy balance lives here, never in code — see docs/02-tech-stack.md §3.
@@ -12,7 +17,7 @@ namespace ScalePunch.Enemies
     public class EnemyDefinition : ScriptableObject
     {
         [Header("Identity")]
-        public string id = "grunt";
+        public string id = "shambler";
         public Enemy prefab;
 
         [Header("Base stats (wave 1, stage 1)")]
@@ -23,8 +28,9 @@ namespace ScalePunch.Enemies
         public float attackInterval = 1.0f;
 
         [Header("Behaviour")]
-        public EnemyBehaviour behaviour = EnemyBehaviour.Chase;
-        [Tooltip("Brutes ignore knockback entirely.")]
+        public EnemyBehaviour behaviour = EnemyBehaviour.Shambler;
+        [Tooltip("1 = immune. Brutes should ignore bullet knockback entirely, or " +
+                 "sustained fire trivially stunlocks them at the edge of the radius.")]
         [Range(0f, 1f)] public float knockbackResistance = 0f;
 
         [Header("Rewards")]

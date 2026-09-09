@@ -17,15 +17,22 @@ namespace ScalePunch.Data
         [Tooltip("Time scale held during hitstop. Never exactly 0 — a total freeze reads as a hitch.")]
         [Range(0f, 0.5f)] public float hitstopTimeScale = 0.05f;
 
-        [Header("Screen shake")]
+        [Header("Screen shake — impact")]
         public float shakeNormal = 0.10f;
         public float shakeCrit = 0.22f;
         public float shakeKill = 0.16f;
         public float shakeDuration = 0.18f;
 
-        [Header("Knockback")]
-        public float knockbackNormal = 4f;
-        public float knockbackCrit = 7f;
+        [Header("Screen shake — firing")]
+        [Tooltip("Per-shot recoil kick. Keep this MUCH smaller than the impact " +
+                 "shakes: at 3+ shots per second it is constant, and anything " +
+                 "over ~0.04 becomes nausea rather than punch.")]
+        public float shakeOnFire = 0.025f;
+        public float shakeOnFireDuration = 0.06f;
+
+        [Header("Knockback — bullet impact")]
+        public float knockbackNormal = 1.6f;
+        public float knockbackCrit = 3.2f;
 
         [Header("Hit flash")]
         [Range(0f, 0.5f)] public float flashDuration = 0.08f;

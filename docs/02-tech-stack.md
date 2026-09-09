@@ -49,6 +49,8 @@ times, and you must be able to do it without recompiling.
 
 ```
 AbilityDefinition   id, name, icon, type, levels[], evolvesFrom, evolveRequires
+WeaponDefinition    projectile, hitRadius, damage/fireRate/range/speed mults,
+                    extraProjectiles, spread, inaccuracy, steerRate
 EnemyDefinition     prefab, baseHP, baseDamage, moveSpeed, behaviour, xpValue
 WaveDefinition      entries[] { timeOffset, enemyId, count, spawnPattern }
 StageDefinition     waves[], bossId, hpMultiplier, dmgMultiplier, rewards
@@ -68,7 +70,9 @@ Assets/
     Scenes/       Boot, Meta, Run
     Scripts/
       Core/       GameManager, SceneLoader, ServiceLocator, EventBus
-      Combat/     PlayerController, AutoAttack, Health, DamageSystem, Hitstop
+      Combat/     StatSheet, Health, DamageInfo
+      Weapons/    WeaponDefinition, Projectile, ProjectileService
+      Player/     PlayerStats, AutoShoot
       Enemies/    EnemySpawner, EnemyAI, EnemyPool
       Abilities/  AbilitySystem, AbilityRuntime, DraftController, Evolution
       Loot/       XPSystem, DropTable, PickupMagnet
@@ -88,12 +92,19 @@ unloadable so a failed run cannot leak state into the meta.
 1. **Pool everything.** Enemies, projectiles, damage numbers, XP gems, VFX,
    audio sources. Zero `Instantiate` during a run.
 2. **No per-frame `GetComponent` or `Find`.** Cache in `Awake`.
-3. **Spatial queries, not O(n²).** Use a uniform grid or `OverlapSphereNonAlloc`
-   for "nearest enemy", never a loop over all enemies per attacker.
-4. **GPU instancing + a shared atlas** for enemy materials.
-5. **Damage numbers are the classic frame killer.** Pool them, cap concurrent
+3. **Spatial queries, not O(n²).** All of them go through `EnemyRegistry` — no
+   colliders, no rigidbodies, no layer masks, and no 150-rigidbody frame cost.
+   A linear scan is correct at M0 scale; swap the backing store for a uniform
+   grid at M3 if the profiler asks, without touching a single caller.
+4. **Sweep projectiles, never point-test them.** A 30 m/s round covers half a
+   metre per frame and will tunnel straight through a zombie standing between
+   its old and new positions.
+5. **GPU instancing + a shared atlas** for zombie materials. Use
+   `MaterialPropertyBlock` for hit flashes — instancing a material per zombie
+   is a silent memory and batching disaster at 150 of them.
+6. **Damage numbers are the classic frame killer.** Pool them, cap concurrent
    count at ~40, use a single canvas with `CanvasGroup` batching.
-6. **Target 60 fps on a 4-year-old mid-range Android.** Test on real hardware
+7. **Target 60 fps on a 4-year-old mid-range Android.** Test on real hardware
    early; the editor lies. Profile with 150 enemies on screen, not 10.
 
 ## 6. Save data
@@ -104,9 +115,9 @@ Local JSON, versioned, with a migration path from day one:
 {
   "version": 3,
   "currencies": { "coins": 0, "gems": 0, "scrap": 0 },
-  "gear":       [ { "defId": "gloves_epic", "level": 4, "affixes": [...] } ],
-  "equipped":   { "gloves": "uid_1", "shoes": null },
-  "rooms":      { "gym": 12, "kitchen": 8, "vault": 5 },
+  "gear":       [ { "defId": "barrel_epic", "level": 4, "affixes": [...] } ],
+  "equipped":   { "weapon": "uid_1", "barrel": null },
+  "rooms":      { "armoury": 12, "infirmary": 8, "radar": 5, "vault": 5 },
   "progress":   { "highestStage": 14, "unlockedAbilities": [...] },
   "lastSeenUtc": "2026-09-09T10:00:00Z"
 }

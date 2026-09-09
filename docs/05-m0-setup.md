@@ -1,9 +1,12 @@
 # M0 Setup — wiring the scaffold into a Unity scene
 
 The scripts in `Assets/_Project/Scripts/` are complete but inert. Unity scenes
-and prefabs are binary-ish YAML that cannot sensibly be hand-authored outside
-the editor, so this is the 30-minute manual pass that turns the code into a
-playable build.
+and prefabs are editor-authored YAML that cannot sensibly be hand-written, so
+this is the ~30-minute manual pass that turns the code into a playable build.
+
+**What M0 is:** a stationary survivor with an engagement radius drawn on the
+ground. Zombies converge from all directions; anything crossing the ring is
+acquired and shot automatically. No movement, no joystick, no fire button.
 
 **Prerequisite:** Unity 6 LTS, 3D (URP) template, project created *at this repo
 root* so `Assets/` lands next to `docs/`.
@@ -13,87 +16,112 @@ Install TextMeshPro when prompted (Window ▸ TextMeshPro ▸ Import TMP Essenti
 
 ---
 
-## 1. Tuning asset
+## 1. Data assets
 
-`Assets/_Project/Data/` → right-click ▸ Create ▸ ScalePunch ▸ Combat Tuning.
-Name it `CombatTuning`. Leave the defaults; they are the starting point, not
-the answer.
+In `Assets/_Project/Data/`:
 
-## 2. Scene: `Run`
+- Create ▸ ScalePunch ▸ **Combat Tuning** → name it `CombatTuning`.
+- Create ▸ ScalePunch ▸ **Weapon Definition** → name it `Weapon_Pistol`.
+  Leave the multipliers at 1; the player's stat sheet supplies the real numbers.
+- Create ▸ ScalePunch ▸ **Enemy Definition** → `Zombie_Shambler`
+  (`baseHP` 20, `baseDamage` 8, `moveSpeed` 2.5).
 
-Create `Assets/_Project/Scenes/Run.unity`.
+Defaults are a starting point, not an answer.
 
-### Player
+## 2. Projectile prefab
+
+`Assets/_Project/Prefabs/Projectile_Bullet.prefab`:
 ```
-Player                    (empty GameObject at origin)
-├─ CharacterController      radius 0.4, height 1.8, center (0, 0.9, 0)
-├─ Health
-├─ PlayerStats
-├─ PlayerController
-├─ AutoAttack
-└─ Model                  (child — a Capsule with its collider REMOVED)
-   └─ Origin              (child empty at (0, 1, 0.5) — the punch origin)
+Projectile_Bullet         (small Capsule or Quad, scale ~0.15, collider REMOVED)
+├─ Projectile               → Trail = the TrailRenderer below
+└─ TrailRenderer            time 0.08, width 0.12 → 0, unlit additive material
 ```
-Assign on `PlayerController`: **Model** = the Model child.
-Assign on `AutoAttack`: **Model** = Model, **Punch Origin** = Origin.
+Rounds need no collider and no rigidbody — hit detection is a swept segment
+test against `EnemyRegistry`, not physics.
 
-Removing the capsule's collider matters: `CharacterController` provides
-collision, and a second collider on a child makes the player shove itself.
+Assign this prefab to `Weapon_Pistol`'s **Projectile Prefab**.
 
-### Camera rig
-```
-CameraRig                 (empty GameObject)
-└─ Main Camera            (child, localPosition ZERO, rotation x=52)
-   ├─ CameraShake           → Tuning = CombatTuning
-   └─ DamageNumberService   → see §4
-```
-Put `CameraFollow` on **CameraRig** (not the camera) and set Target = Player.
-The rig moves, the camera shakes in local space; they never fight.
+The trail is not decoration. At 30 m/s a round crosses the radius in a third of
+a second; without a tracer the player sees no shot at all, only zombies falling
+over.
 
-### Services
-```
-Systems                   (empty GameObject)
-├─ Hitstop                  → Tuning = CombatTuning
-└─ EnemySpawner             → Target = Player, Definitions = §3
-```
+## 3. Zombie prefab
 
-## 3. Enemy prefab and definition
-
-Build the prefab at `Assets/_Project/Prefabs/Enemy_Grunt.prefab`:
+`Assets/_Project/Prefabs/Zombie_Shambler.prefab`:
 ```
-Enemy_Grunt               (Capsule, collider REMOVED — combat is registry-based,
-│                          not physics-based, so enemies need no colliders)
+Zombie_Shambler           (Capsule, collider REMOVED — combat is registry-based)
 ├─ Health
 ├─ EnemyMovement
 ├─ Enemy
 ├─ HitFlash                 → Tuning = CombatTuning
 └─ CombatFeedback           → Tuning = CombatTuning
 ```
+Assign it to `Zombie_Shambler`'s **Prefab** field.
 
-Then Create ▸ ScalePunch ▸ Enemy Definition → `Enemy_Grunt`:
-`id` = grunt, `prefab` = the prefab above, `baseHP` 20, `baseDamage` 8,
-`moveSpeed` 2.5.
+Then duplicate the *definition* twice for the M0 roster:
+- **Runner** — `moveSpeed` 4.5, `baseHP` 10, `behaviour` Runner
+- **Brute** — `baseHP` 90, `moveSpeed` 1.4, `knockbackResistance` 1, `scale` 1.4
 
-Drag that definition into the spawner's **Definitions** array.
+Three definitions can share one prefab; they differ only by stats and tint.
 
-Duplicate it twice for the M0 roster — a Runner (`moveSpeed` 4.5, `baseHP` 10)
-and a Brute (`baseHP` 90, `moveSpeed` 1.4, `knockbackResistance` 1).
+## 4. Scene: `Run`
 
-## 4. UI
+Create `Assets/_Project/Scenes/Run.unity`.
+
+### Player
+```
+Player                    (empty GameObject at origin)
+├─ Health
+├─ PlayerStats
+├─ AutoShoot                → Weapon = Weapon_Pistol, Tuning = CombatTuning,
+│                             Turret = Turret, Muzzle = Muzzle
+├─ Turret                 (child — Capsule with its collider REMOVED)
+│  └─ Muzzle              (child empty at (0, 1.2, 0.6) — barrel tip)
+└─ RangeRing              (child at y=0)
+   ├─ LineRenderer          width 0.08, loop ON, unlit additive material,
+   │                        Use World Space OFF
+   └─ RangeIndicator        → Weapon = AutoShoot on Player
+```
+Remove the capsule collider on Turret: the player is stationary and nothing
+needs to collide with it.
+
+### Camera
+```
+Main Camera               (position (0, 16, -11), rotation x=55)
+├─ CameraShake              → Tuning = CombatTuning
+└─ DamageNumberService      → see §5
+```
+The player never moves, so no follow rig is needed — a static camera is correct
+here. `CameraFollow` is still in the repo for later; leave it off the scene.
+
+`CameraShake` writes `localPosition`, so the camera must be a **root** object
+(or under an unmoving parent) for the numbers in `CombatTuning` to read right.
+
+### Services
+```
+Systems                   (empty GameObject)
+├─ Hitstop                  → Tuning = CombatTuning
+├─ ProjectileService
+└─ EnemySpawner             → Target = Player,
+                              Definitions = the three zombie definitions,
+                              Spawn Radius = 16
+```
+**Spawn Radius must exceed the engagement radius** (base 9). A zombie that
+spawns already inside the ring robs the player of the approach, which is the
+only tension the game has.
+
+### Ground
+A Plane scaled to 10 (100×100 m). Keep its collider or not — nothing uses
+physics — but keep it visually darker than the range ring.
+
+## 5. UI
 
 ```
 Canvas                    (Screen Space - Overlay, Scaler: Scale With Screen Size,
 │                          reference 1080×1920, Match 0.5)
-├─ JoystickArea           (Image, alpha 0, Raycast Target ON,
-│  │                       anchored to the LEFT HALF of the screen)
-│  ├─ VirtualJoystick      (the script, on JoystickArea itself)
-│  ├─ Background          (Image, 220×220, disabled by default)
-│  └─ Handle              (Image, 90×90, disabled by default)
 └─ DamageNumbers          (empty RectTransform, stretched full screen,
                            Raycast Target OFF)
 ```
-Assign Background and Handle on the `VirtualJoystick`, then assign the
-joystick to `PlayerController`.
 
 Damage number prefab at `Assets/_Project/Prefabs/DamageNumber.prefab`:
 a RectTransform with `TextMeshProUGUI` (centre-aligned, size 48, Raycast Target
@@ -102,42 +130,51 @@ OFF), a `CanvasGroup`, and the `DamageNumber` script.
 On `DamageNumberService`: Tuning = CombatTuning, Prefab = that prefab,
 Canvas Root = the DamageNumbers object, World Camera = Main Camera.
 
-Make sure the scene has an **EventSystem** (GameObject ▸ UI ▸ Event System) or
-the joystick receives nothing.
-
-## 5. Ground
-
-A Plane scaled to 10 (100×100 m) with its default collider kept — the
-`CharacterController` needs something to stand on.
+No EventSystem or joystick is needed — M0 takes no input at all.
 
 ---
 
 ## Run it
 
-Press play. You should be able to walk with WASD (the editor fallback), enemies
-should stream in from off-screen, and punching should produce hitstop, a white
-flash, knockback, floating numbers, and a camera kick.
+Press play. Zombies should walk in from off screen, the turret should snap to
+the first one crossing the ring, and rounds should trace out, land, flash the
+zombie white, kick the camera, and throw a damage number.
 
 ## Then do the only part that matters
 
-Build to your **actual phone** and play for ten minutes. M0's exit criterion is
-not "it works" — it is *"punching 30 grey capsules is satisfying with no art"*.
+Build to your **actual phone** and watch it for ten minutes. M0's exit criterion
+is not "it works" — it is *"holding the ring against 30 grey capsules is
+satisfying with no art"*.
 
-Tune in this order, one at a time, in `CombatTuning`:
+Tune in this order, one at a time, in `CombatTuning` and `PlayerStats`:
 
-1. `hitstopNormal` — 0.03 to 0.07. Too high reads as lag, too low as nothing.
-2. `knockbackNormal` — enemies should visibly move, not fly.
-3. `AttackSpeed` on PlayerStats — start at 1.5-2.0; slower feels dead.
-4. `AttackRange` + `halfAngle` — you want to feel generous, not accurate.
-5. `shakeNormal` — the last thing to raise, the first thing players complain about.
+1. **`FireRate`** (start 3, try 2-6). The single biggest feel lever. Too slow
+   reads as broken; too fast reads as free.
+2. **`Range`** vs zombie `moveSpeed`. You want zombies to *nearly* reach you.
+   If nothing gets close, the run has no tension; if everything does, it is
+   unfair. This ratio is the whole difficulty curve.
+3. **`ProjectileSpeed`** (20-40). Too slow and rounds visibly trail behind
+   runners; too fast and there is no tracer to see.
+4. **`hitstopNormal`** (0.03-0.07). Too high reads as lag, too low as nothing.
+5. **`knockbackNormal`** (~1.6). Zombies should stagger, not fly. Keep Brutes
+   at `knockbackResistance` 1 or sustained fire stunlocks them at the ring.
+6. **`shakeOnFire`** (~0.025) — last. At 3+ shots/sec this is constant;
+   anything above ~0.04 is nausea, not punch.
 
 If it is still not fun after that, the fix is in these numbers, not in more
 features. Do not start M1 until it is.
 
 ## Known gaps at M0 (deliberate)
 
-- No XP, levelling, or ability draft — that is M1.
+- No XP, levelling, or ability draft — that is M1, and it is the only in-run
+  interaction the design has. See `docs/01-game-design.md` §2.1.
 - The spawner ramps on a timer; `WaveDefinition` timelines land in M1.
 - Player death does nothing. No run-end screen yet.
-- `Luck`, `CooldownReduction` and `Armor` exist in `StatType` but nothing reads
-  them yet; they are there so M1 does not need a refactor.
+- **Lifesteal is not wired.** With projectiles, healing happens at the point of
+  impact rather than the point of firing, and the round would need a reference
+  back to the shooter. The stat exists; nothing reads it.
+- `Armor`, `Luck` and `CooldownReduction` are likewise declared but unread —
+  they are there so M1 does not need a refactor.
+- `EnemyBehaviour` is authoring intent only. Shambler, Runner and Brute
+  genuinely differ by stats alone; Spitter needs ranged-attack code at M1.
+- Target priority is a serialised field, not a HUD control yet.

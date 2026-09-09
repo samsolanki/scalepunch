@@ -9,22 +9,24 @@ double them if you are learning Unity as you go.
 
 ---
 
-## M0 — Punch something (3-5 days)
+## M0 — Hold the ring (3-5 days)
 
-**Goal:** a grey box that punches other grey boxes and it feels good.
+**Goal:** a grey box that shoots grey boxes crossing its radius, and it feels
+good.
 
 - [ ] Unity project, URP mobile, git + `.gitignore` (already committed here)
-- [ ] Ground plane, capsule player, top-down camera follow
-- [ ] Floating virtual joystick movement
-- [ ] Auto-attack: find nearest enemy in range, swing on a timer
+- [ ] Ground plane, stationary capsule player, static top-down camera
+- [ ] Visible engagement radius on the ground
+- [ ] Auto-shoot: acquire in radius, hold target, slew, fire on a timer
+- [ ] Pooled projectiles with swept hit detection, pierce and spread
 - [ ] `Health` component, damage, death
-- [ ] One enemy type that walks at the player
-- [ ] Simple spawner: N enemies every M seconds
-- [ ] Hitstop, knockback, hit flash, pooled damage numbers
+- [ ] One zombie type that walks at the player
+- [ ] Spawner ringing the player from outside the radius
+- [ ] Hitstop, knockback, hit flash, pooled damage numbers, fire shake
 
-**Exit test:** you punch 30 capsules on your phone and it is *satisfying* with
-zero art. If it is not fun here, no amount of content fixes it. Stop and
-retune attack speed, range, knockback, and hitstop until it is.
+**Exit test:** you hold off 30 capsules on your phone and it is *satisfying*
+with zero art. If it is not fun here, no amount of content fixes it. Retune
+fire rate, radius, projectile speed, knockback and hitstop until it is.
 
 ---
 
@@ -35,15 +37,22 @@ retune attack speed, range, knockback, and hitstop until it is.
 - [ ] XP gems drop on death, magnet pickup, level curve
 - [ ] Level-up pause + 3-card draft UI
 - [ ] `AbilityDefinition` ScriptableObjects; **8 abilities** (4 active, 4 passive)
+- [ ] Target-priority toggle on the HUD (closest / advanced / weakest / toughest)
 - [ ] Ability runtime: cooldowns, levels, stat recalculation
 - [ ] Wave timeline from `WaveDefinition`; 8 waves over ~4 min
-- [ ] 4 enemy types (Grunt, Runner, Brute, Spitter)
+- [ ] 4 zombie types (Shambler, Runner, Brute, Spitter — the Spitter needs
+      ranged-attack code, the others are stat variants)
 - [ ] One boss with two phases and telegraphed attacks
 - [ ] Victory + defeat screens with a reward summary
 - [ ] Object pooling pass across enemies, gems, VFX, numbers
 
 **Exit test:** you play five runs back to back voluntarily and take different
 builds. Get playtesters on it — you have stopped being able to judge it.
+
+**Watch for:** if testers describe runs as "watching" rather than playing, add
+one manually-triggered active on a cooldown (a grenade, a wall) before adding
+any more content. With a stationary player and automatic fire, the draft is the
+only interaction a run has — one button changes that cheaply.
 
 ---
 
@@ -71,16 +80,18 @@ are saving up for.
 **Goal:** it stops looking like a prototype.
 
 - [ ] Abilities to 25-30, including **5 evolutions**
-- [ ] Enemies to 8 types + 3 bosses
+- [ ] Zombies to 8 types + 3 bosses
 - [ ] 30 stages across 3 themed chapters
-- [ ] Replace grey boxes: low-poly character, enemies, environments
+- [ ] Replace grey boxes: low-poly survivor, zombies, environments
+- [ ] Muzzle flash, tracers, impact decals, blood — the shooting VFX pass
 - [ ] Full VFX pass — impacts, trails, level-up burst, boss telegraphs
 - [ ] Audio: punch layers with pitch variation, music, UI clicks, boss stings
 - [ ] UI art pass, DOTween transitions everywhere, no instant screen swaps
 - [ ] Onboarding: first four runs each reveal one system, no pop-up tutorials
 - [ ] Settings, credits, privacy policy link
 
-**Exit test:** 60 fps with 150 enemies on a mid-range Android from 2022.
+**Exit test:** 60 fps with 150 zombies and 40 rounds in flight on a mid-range
+Android from 2022.
 
 ---
 

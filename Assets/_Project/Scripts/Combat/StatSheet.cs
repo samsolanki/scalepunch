@@ -22,13 +22,15 @@ namespace ScalePunch.Combat
         [SerializeField]
         BaseValue[] baseValues =
         {
-            new() { stat = StatType.MaxHP,          value = 100f },
-            new() { stat = StatType.Damage,         value = 10f  },
-            new() { stat = StatType.AttackSpeed,    value = 1.0f },
-            new() { stat = StatType.AttackRange,    value = 2.0f },
-            new() { stat = StatType.MoveSpeed,      value = 4.0f },
-            new() { stat = StatType.CritChance,     value = 0.05f },
-            new() { stat = StatType.CritMultiplier, value = 2.0f },
+            new() { stat = StatType.MaxHP,           value = 100f },
+            new() { stat = StatType.Damage,          value = 10f  },
+            new() { stat = StatType.FireRate,        value = 3.0f },
+            new() { stat = StatType.Range,           value = 9.0f },
+            new() { stat = StatType.CritChance,      value = 0.05f },
+            new() { stat = StatType.CritMultiplier,  value = 2.0f },
+            new() { stat = StatType.ProjectileSpeed, value = 30f  },
+            new() { stat = StatType.ProjectileCount, value = 1f   },
+            new() { stat = StatType.Pierce,          value = 0f   },
         };
 
         readonly Dictionary<StatType, float> _base = new();

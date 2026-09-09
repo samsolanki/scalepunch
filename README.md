@@ -1,17 +1,23 @@
 # ScalePunch
 
-A mobile survivors-like action roguelite with an idle base meta — waves of
-enemies, fist-only auto-combat, an ability draft on every level-up, and gear
-plus base-building progression between runs.
+A mobile zombie-defence roguelite with an idle base meta. The player is a
+**fixed emplacement** with an engagement radius: zombies converge from every
+direction, anything crossing the ring is acquired and shot automatically, and
+an ability draft on every level-up plus gear and base-building between runs
+carry the progression.
+
+No movement, no joystick, no fire button — the decisions are what you draft and
+what you upgrade, not where you stand.
 
 Genre reference: *Endless Puncher* (Rollic Games), *Archero*,
-*Vampire Survivors*.
+*Vampire Survivors*, tower-defence idle shooters.
 
 ## Status
 
 **M0 in progress.** Design and build plan complete. Combat scaffold written
 (`Assets/_Project/Scripts/`) but not yet wired into a Unity scene — see
-[`docs/05-m0-setup.md`](docs/05-m0-setup.md).
+[`docs/05-m0-setup.md`](docs/05-m0-setup.md). The scripts have not been
+compiled against a Unity install yet.
 
 Engine: Unity 6 LTS, URP, 3D.
 
@@ -30,14 +36,21 @@ Engine: Unity 6 LTS, URP, 3D.
 1. Create a Unity 6 LTS (3D / URP) project at this repo root so `Assets/` sits
    beside `docs/`.
 2. Follow [`docs/05-m0-setup.md`](docs/05-m0-setup.md) to build the `Run` scene.
-3. Build to a real phone and tune `CombatTuning` until punching grey capsules is
-   fun with no art. Nothing later fixes a core loop that fails this test.
+3. Build to a real phone and tune `CombatTuning` until holding the ring against
+   grey capsules is fun with no art. Nothing later fixes a core loop that fails
+   this test.
 
 ## Architecture notes
 
-- **Combat is registry-based, not physics-based.** `EnemyRegistry` answers all
-  "nearest enemy" and "enemies in range" queries. No colliders, no rigidbodies,
-  no layer masks — and no 150-rigidbody frame cost on mid-range Android.
+- **Combat is registry-based, not physics-based.** `EnemyRegistry` answers
+  every "nearest zombie", "zombies in range" and projectile-sweep query. No
+  colliders, no rigidbodies, no layer masks — and no 150-rigidbody frame cost
+  on mid-range Android.
+- **Projectiles sweep, they do not point-test.** A 30 m/s round covers half a
+  metre per frame and would otherwise tunnel through anything standing between
+  its old and new position.
+- **Weapons are multipliers over the player's stat sheet**, never absolute
+  numbers, so every weapon scales off one upgrade tree.
 - **Nothing calls `Instantiate` during a run.** Everything goes through
   `Pool<T>`.
 - **Balance lives in ScriptableObjects**, never in code. `CombatTuning` holds

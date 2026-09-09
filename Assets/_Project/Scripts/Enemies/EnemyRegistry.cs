@@ -52,6 +52,48 @@ namespace ScalePunch.Enemies
             return best;
         }
 
+        /// <summary>
+        /// First zombie whose body intersects the swept segment a projectile
+        /// covered this frame, nearest to <paramref name="from"/> first.
+        ///
+        /// Sweeping rather than point-testing matters: a 30 m/s round covers
+        /// half a metre per frame, so a point test at the round's new position
+        /// would punch straight through a zombie that was standing between the
+        /// two positions.
+        /// </summary>
+        public static Enemy FindFirstAlongSegment(Vector3 from, Vector3 to, float radius,
+                                                  List<Enemy> ignore = null)
+        {
+            float radiusSqr = radius * radius;
+            float bestT = float.MaxValue;
+            Enemy best = null;
+
+            for (int i = 0; i < Active.Count; i++)
+            {
+                Enemy e = Active[i];
+                if (e == null || e.IsDead) continue;
+                if (ignore != null && ignore.Contains(e)) continue;
+
+                float sqr = SqrDistanceToSegment(e.transform.position, from, to, out float t);
+                if (sqr > radiusSqr || t >= bestT) continue;
+
+                bestT = t;
+                best = e;
+            }
+            return best;
+        }
+
+        /// <summary>Squared distance from a point to a segment, with the
+        /// normalised position along that segment of the closest point.</summary>
+        static float SqrDistanceToSegment(Vector3 point, Vector3 a, Vector3 b, out float t)
+        {
+            Vector3 ab = b - a;
+            float abSqr = ab.sqrMagnitude;
+
+            t = abSqr < 0.000001f ? 0f : Mathf.Clamp01(Vector3.Dot(point - a, ab) / abSqr);
+            return (point - (a + ab * t)).sqrMagnitude;
+        }
+
         /// <summary>Non-allocating cone query. Results are appended, not cleared.</summary>
         public static void FindInCone(Vector3 origin, Vector3 forward, float range,
                                       float halfAngleDeg, List<Enemy> results)
