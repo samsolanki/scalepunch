@@ -89,11 +89,11 @@ namespace ScalePunch.EditorTools
         /// <summary>See Reacquire(DataSet) - same reason, same fix.</summary>
         static void Reacquire(PrefabSet set)
         {
-            set.bullet = LoadPrefab<Projectile>("Projectile_Bullet");
-            set.gem = LoadPrefab<XPGem>("XPGem");
-            set.zombie = LoadPrefab<Enemy>("Zombie");
-            set.damageNumber = LoadPrefab<DamageNumber>("DamageNumber");
-            set.draftCard = LoadPrefab<DraftCard>("DraftCard");
+            set.bullet = Keep(LoadPrefab<Projectile>("Projectile_Bullet"), set.bullet);
+            set.gem = Keep(LoadPrefab<XPGem>("XPGem"), set.gem);
+            set.zombie = Keep(LoadPrefab<Enemy>("Zombie"), set.zombie);
+            set.damageNumber = Keep(LoadPrefab<DamageNumber>("DamageNumber"), set.damageNumber);
+            set.draftCard = Keep(LoadPrefab<DraftCard>("DraftCard"), set.draftCard);
         }
 
         static PrefabSet BuildPrefabs(DataSet data, MaterialSet mats)

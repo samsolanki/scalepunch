@@ -123,17 +123,23 @@ namespace ScalePunch.EditorTools
         /// </summary>
         static void Reacquire(DataSet set)
         {
-            set.tuning = LoadData<CombatTuning>("CombatTuning");
-            set.curve = LoadData<LevelCurve>("LevelCurve");
-            set.pistol = LoadData<WeaponDefinition>("Weapon_Pistol");
-            set.library = LoadData<AbilityLibrary>("AbilityLibrary");
+            set.tuning = Keep(LoadData<CombatTuning>("CombatTuning"), set.tuning);
+            set.curve = Keep(LoadData<LevelCurve>("LevelCurve"), set.curve);
+            set.pistol = Keep(LoadData<WeaponDefinition>("Weapon_Pistol"), set.pistol);
+            set.library = Keep(LoadData<AbilityLibrary>("AbilityLibrary"), set.library);
 
-            set.zombies = new[]
+            string[] files = { "Zombie_Shambler", "Zombie_Runner", "Zombie_Brute" };
+            var zombies = new EnemyDefinition[files.Length];
+
+            for (int i = 0; i < files.Length; i++)
             {
-                LoadData<EnemyDefinition>("Zombie_Shambler"),
-                LoadData<EnemyDefinition>("Zombie_Runner"),
-                LoadData<EnemyDefinition>("Zombie_Brute")
-            };
+                EnemyDefinition live = set.zombies != null && i < set.zombies.Length
+                    ? set.zombies[i]
+                    : null;
+                zombies[i] = Keep(LoadData<EnemyDefinition>(files[i]), live);
+            }
+
+            set.zombies = zombies;
         }
 
         static EnemyDefinition Zombie(string file, string id, float hp, float damage,

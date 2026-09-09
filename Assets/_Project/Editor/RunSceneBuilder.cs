@@ -109,6 +109,8 @@ namespace ScalePunch.EditorTools
             Reacquire(data);
             Reacquire(prefabs);
 
+            if (!Validate(data, prefabs)) return;
+
             BuildScene(data, prefabs, mats);
 
             // Trust nothing: confirm the scene actually landed on disk rather
@@ -286,6 +288,60 @@ namespace ScalePunch.EditorTools
                 p.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
 
             so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
+        /// Prefers a freshly loaded asset but falls back to the reference already
+        /// held.
+        ///
+        /// An asset written moments ago is not reliably resolvable by path in the
+        /// same frame - AssetDatabase.Refresh() is what normally makes it so, and
+        /// calling Refresh here is exactly what destroys these references. So the
+        /// lookup is best-effort, and the live object stays authoritative when it
+        /// comes back empty. Overwriting a good reference with null is strictly
+        /// worse than keeping it.
+        /// </summary>
+        static T Keep<T>(T loaded, T existing) where T : Object
+            => loaded != null ? loaded : existing;
+
+        /// <summary>
+        /// Refuses to build a scene with null references in it. Without this the
+        /// builder happily reports success and hands back a scene that loads,
+        /// runs, and does nothing - no spawner definitions, no weapon, no prefabs.
+        /// </summary>
+        static bool Validate(DataSet data, PrefabSet prefabs)
+        {
+            var missing = new List<string>();
+
+            void Check(Object o, string label)
+            {
+                if (o == null) missing.Add(label);
+            }
+
+            Check(data.tuning, "CombatTuning");
+            Check(data.curve, "LevelCurve");
+            Check(data.pistol, "Weapon_Pistol");
+            Check(data.library, "AbilityLibrary");
+
+            if (data.zombies == null || data.zombies.Length == 0)
+                missing.Add("zombie definitions (empty)");
+            else
+                for (int i = 0; i < data.zombies.Length; i++)
+                    Check(data.zombies[i], $"zombie definition [{i}]");
+
+            Check(prefabs.bullet, "Projectile_Bullet prefab");
+            Check(prefabs.gem, "XPGem prefab");
+            Check(prefabs.zombie, "Zombie prefab");
+            Check(prefabs.damageNumber, "DamageNumber prefab");
+            Check(prefabs.draftCard, "DraftCard prefab");
+
+            if (missing.Count == 0) return true;
+
+            Debug.LogError("[ScalePunch] Aborting: these references are null, so the scene " +
+                           "would build but do nothing.
+  " + string.Join("
+  ", missing));
+            return false;
         }
 
         static GameObject Child(string name, Transform parent)
