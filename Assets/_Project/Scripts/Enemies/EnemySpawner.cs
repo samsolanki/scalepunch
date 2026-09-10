@@ -29,6 +29,14 @@ namespace ScalePunch.Enemies
                  "radius and the player's engagement radius.")]
         [SerializeField] float spawnRadius = 16f;
 
+        [Header("Prototype (waves off)")]
+        [Tooltip("Seconds between spawns at the start of an endless run.")]
+        [SerializeField] float initialInterval = 1.4f;
+        [SerializeField] float minimumInterval = 0.25f;
+        [Tooltip("Seconds of run time per difficulty step, used for HP scaling and " +
+                 "to halve the spawn interval every three steps.")]
+        [SerializeField] float secondsPerStep = 20f;
+
         [Header("Budget")]
         [Tooltip("Hard cap. 150 is the mobile budget from docs/02-tech-stack.md §5.")]
         [SerializeField] int maxConcurrent = 150;
@@ -40,6 +48,10 @@ namespace ScalePunch.Enemies
 
         Transform _poolRoot;
         Phase _phase = Phase.Idle;
+        bool _useWaves;
+        bool _useBoss;
+        float _elapsed;
+        float _endlessTimer;
         int _waveIndex = -1;
         int _cursor;
         float _waveElapsed;
@@ -70,6 +82,9 @@ namespace ScalePunch.Enemies
         {
             EnemyRegistry.Clear();
 
+            _useWaves = PrototypeConfig.Active.waves;
+            _useBoss = PrototypeConfig.Active.boss;
+
             _poolRoot = new GameObject("~EnemyPool").transform;
             _poolRoot.SetParent(transform, false);
 
@@ -81,6 +96,10 @@ namespace ScalePunch.Enemies
 
             foreach (EnemyDefinition def in stage.AllEnemies())
             {
+                // Skip the boss prefab's pool entirely when bosses are off, rather
+                // than pre-warming a 2.2x-scale prefab that will never spawn.
+                if (!_useBoss && def == stage.boss) continue;
+
                 if (def == null || def.prefab == null)
                 {
                     Debug.LogError($"[EnemySpawner] Definition '{(def == null ? "null" : def.id)}' has no prefab.", this);
@@ -100,7 +119,9 @@ namespace ScalePunch.Enemies
         void Start()
         {
             if (stage == null) return;
-            BeginNextWave();
+
+            if (_useWaves) BeginNextWave();
+            else _phase = Phase.Waves;   // endless: the same phase, a different tick
         }
 
         void Update()
@@ -108,12 +129,55 @@ namespace ScalePunch.Enemies
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
+            _elapsed += dt;
+
             switch (_phase)
             {
-                case Phase.Waves: TickWaves(dt); break;
+                case Phase.Waves:
+                    if (_useWaves) TickWaves(dt);
+                    else TickEndless(dt);
+                    break;
                 case Phase.BossIntro: TickBossIntro(dt); break;
                 case Phase.Boss: TickBoss(); break;
             }
+        }
+
+        /// <summary>
+        /// Prototype spawning: one zombie at a time on an accelerating timer,
+        /// forever. No structure, no end — just enough pressure to answer whether
+        /// holding the ring is fun.
+        /// </summary>
+        void TickEndless(float dt)
+        {
+            _endlessTimer -= dt;
+            if (_endlessTimer > 0f) return;
+
+            // Halves roughly every three steps, floored so it stays playable.
+            float t = _elapsed / (secondsPerStep * 3f);
+            _endlessTimer = Mathf.Max(minimumInterval, initialInterval * Mathf.Pow(0.5f, t));
+
+            if (EnemyRegistry.Count >= maxConcurrent) return;
+
+            EnemyDefinition def = RandomOrdinaryZombie();
+            if (def != null) Spawn(def, UnityEngine.Random.value * 360f, waveOverride: EndlessStep);
+        }
+
+        int EndlessStep => Mathf.FloorToInt(_elapsed / secondsPerStep);
+
+        EnemyDefinition RandomOrdinaryZombie()
+        {
+            // Straight off the pool keys, so it can only ever pick something that
+            // was actually pre-warmed — the boss is not among them when bosses
+            // are off.
+            int count = _pools.Count;
+            if (count == 0) return null;
+
+            int index = UnityEngine.Random.Range(0, count);
+            foreach (EnemyDefinition def in _pools.Keys)
+            {
+                if (index-- == 0) return def == stage.boss ? null : def;
+            }
+            return null;
         }
 
         // ------------------------------------------------------------- waves
@@ -226,7 +290,7 @@ namespace ScalePunch.Enemies
 
         void BeginBossPhase()
         {
-            if (stage.boss == null)
+            if (stage.boss == null || !_useBoss)
             {
                 // No boss: the stage is beaten once the field is clear, so the
                 // player is never left standing in an empty arena wondering.

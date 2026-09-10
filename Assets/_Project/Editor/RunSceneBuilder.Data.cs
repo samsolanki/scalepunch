@@ -6,6 +6,7 @@ using ScalePunch.Abilities;
 using ScalePunch.Abilities.Effects;
 using ScalePunch.Combat;
 using ScalePunch.Data;
+using ScalePunch.Core;
 using ScalePunch.Enemies;
 using ScalePunch.Stages;
 using ScalePunch.Progression;
@@ -30,6 +31,7 @@ namespace ScalePunch.EditorTools
             public WaveDefinition[] waves;
             public StageDefinition stage;
             public AbilityLibrary library;
+            public PrototypeConfig prototype;
         }
 
         // ----------------------------------------------------------- materials
@@ -90,6 +92,7 @@ namespace ScalePunch.EditorTools
         {
             var set = new DataSet
             {
+                prototype = Asset<PrototypeConfig>("PrototypeConfig"),
                 tuning = Asset<CombatTuning>("CombatTuning"),
                 curve  = Asset<LevelCurve>("LevelCurve"),
                 pistol = Asset<WeaponDefinition>("Weapon_Pistol")
@@ -129,7 +132,7 @@ namespace ScalePunch.EditorTools
             set.boss = BuildBoss();
             set.waves = BuildWaves(set.zombies, set.boss);
             set.stage = BuildStage(set.waves, set.boss);
-            set.library = BuildAbilities();
+            set.library = BuildAbilities(set.prototype);
 
             // Echo the values actually written. Unity can run a queued menu item
             // against the pre-reload assembly if it is clicked while a compile is
@@ -139,10 +142,14 @@ namespace ScalePunch.EditorTools
                       $"runner {set.zombies[1].baseHP} HP, " +
                       $"brute {set.zombies[2].baseHP} HP / armour {set.zombies[2].armor}, " +
                       $"steer {set.pistol.steerDegreesPerSecond} deg/s, " +
+                      $"prototype: waves {set.prototype.waves}, boss {set.prototype.boss}, " +
+                      $"rarity {set.prototype.abilityRarity}, save {set.prototype.saveAndCurrency}, " +
+                      $"{set.library.abilities.Count} abilities. " +
                       $"drafts at {string.Join('/', set.curve.cumulativeThresholds)} kills, " +
                       $"stage '{set.stage.id}' {set.stage.WaveCount} waves / " +
                       $"{set.stage.TotalWaveSeconds():0}s + boss {set.boss.baseHP} HP");
 
+            EditorUtility.SetDirty(set.prototype);
             EditorUtility.SetDirty(set.stage);
             EditorUtility.SetDirty(set.boss);
             foreach (WaveDefinition w in set.waves) EditorUtility.SetDirty(w);
@@ -162,6 +169,7 @@ namespace ScalePunch.EditorTools
         /// </summary>
         static void Reacquire(DataSet set)
         {
+            set.prototype = Keep(LoadData<PrototypeConfig>("PrototypeConfig"), set.prototype);
             set.boss = Keep(LoadData<EnemyDefinition>("Zombie_Boss"), set.boss);
             set.stage = Keep(LoadData<StageDefinition>("Stage_01"), set.stage);
 
@@ -429,7 +437,7 @@ namespace ScalePunch.EditorTools
             return def;
         }
 
-        static AbilityLibrary BuildAbilities()
+        static AbilityLibrary BuildAbilities(PrototypeConfig prototype)
         {
             var burst     = Asset<RadialBurstEffect>("Effect_RadialBurst");
             var grenade   = Asset<GrenadeEffect>("Effect_Grenade");
@@ -439,8 +447,55 @@ namespace ScalePunch.EditorTools
             EditorUtility.SetDirty(grenade);
             EditorUtility.SetDirty(lightning);
 
-            var abilities = new List<AbilityDefinition>
-            {
+            List<AbilityDefinition> abilities = prototype.fullAbilityRoster
+                ? FullRoster(burst, grenade, lightning)
+                : PrototypeRoster(burst);
+
+            // Weight 0 keeps this out of the normal weighted draw; it is only ever
+            // reached through the library's explicit fallback slot, when every
+            // owned ability is maxed.
+            AbilityDefinition patch = Passive("Ability_Patch", "Field Dressing",
+                StatType.MaxHP, ModifierKind.Flat, 20f, 99, 0f, "max HP");
+
+            AbilityLibrary library = Asset<AbilityLibrary>("AbilityLibrary");
+            library.abilities = abilities;
+            library.fallback = patch;
+
+            // Prototype: every ability is draftable, so a run sees the whole pool
+            // rather than being forced into a build out of three options.
+            library.maxDistinctAbilities = prototype.fullAbilityRoster ? 6 : abilities.Count;
+
+            EditorUtility.SetDirty(library);
+            return library;
+        }
+
+        /// <summary>
+        /// Three abilities, three levels: one active so something visibly
+        /// happens, and two passives whose effect is unmistakable. Enough to
+        /// answer whether the draft is worth interrupting a run for, and no more.
+        /// </summary>
+        static List<AbilityDefinition> PrototypeRoster(RadialBurstEffect burst) => new()
+        {
+            Active("Ability_Shockwave", "Shockwave", burst,
+                new[] { 6.0f, 5.0f, 4.0f },
+                new[] { 1.2f, 1.8f, 2.5f },
+                new[] { 4.0f, 5.0f, 6.0f },
+                new[] { 0, 0, 0 },
+                new[]
+                {
+                    "Blast 120% damage in 4 m, every 6 s",
+                    "Blast 180% damage in 5 m, every 5 s",
+                    "Blast 250% damage in 6 m, every 4 s"
+                },
+                1.0f),
+
+            Passive("Ability_Damage",   "Heavy Rounds", StatType.Damage,   ModifierKind.Percent, 0.15f, 3, 1.0f, "damage"),
+            Passive("Ability_FireRate", "Trigger Work", StatType.FireRate, ModifierKind.Percent, 0.12f, 3, 1.0f, "fire rate")
+        };
+
+        static List<AbilityDefinition> FullRoster(RadialBurstEffect burst, GrenadeEffect grenade,
+                                                  ChainLightningEffect lightning) => new()
+        {
                 Active("Ability_Shockwave", "Shockwave", burst,
                     new[] { 6.0f, 5.5f, 5.0f, 4.5f, 4.0f },
                     new[] { 1.2f, 1.5f, 1.8f, 2.1f, 2.5f },
@@ -495,21 +550,6 @@ namespace ScalePunch.EditorTools
                 // every other stat and is the one upgrade a player can literally
                 // see working - common range cards flatten the difficulty curve.
                 Passive("Ability_Range",     "Long Sight",   StatType.Range,           ModifierKind.Flat,    1f,    5, 0.4f, "m radius")
-            };
-
-            // Weight 0 keeps this out of the normal weighted draw; it is only ever
-            // reached through the library's explicit fallback slot, when every
-            // owned ability is maxed.
-            AbilityDefinition patch = Passive("Ability_Patch", "Field Dressing",
-                StatType.MaxHP, ModifierKind.Flat, 20f, 99, 0f, "max HP");
-
-            AbilityLibrary library = Asset<AbilityLibrary>("AbilityLibrary");
-            library.abilities = abilities;
-            library.fallback = patch;
-            library.maxDistinctAbilities = 6;
-
-            EditorUtility.SetDirty(library);
-            return library;
-        }
+        };
     }
 }

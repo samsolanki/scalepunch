@@ -19,7 +19,42 @@ crossing the ring is acquired and shot automatically. No movement input, no
 aiming input, no fire button. Every level-up pauses the run for a choice of
 three cards — the only interaction a run has.
 
-## 2. Status
+## 2. Prototype mode
+
+The project is currently a **prototype**. Most systems are written and
+compiling but switched off at `Assets/_Project/Data/PrototypeConfig.asset`.
+
+Toggles rather than commented-out code, deliberately: commenting a system out
+across dozens of files makes re-enabling a merge exercise, and code that does
+not compile while disabled rots silently against every change made around it.
+
+| Toggle | Now | On means |
+|---|---|---|
+| `waves` | **off** | Authored 8-wave Stage_01 instead of an endless timer |
+| `boss` | **off** | Two-phase boss after the last wave |
+| `runEndScreen` | **off** | Victory/defeat screen; off = death restarts the run |
+| `abilityRarity` | **off** | Five rarity tiers scaling card magnitude |
+| `saveAndCurrency` | **off** | Coins bank and a profile is written to disk |
+| `healthBars` | **off** | Floating bars over zombies |
+| `fullAbilityRoster` | **off** | 8 abilities × 5 levels instead of 3 × 3 |
+
+`fullAbilityRoster` is read by `RunSceneBuilder` when authoring assets, so
+changing it needs a rebuild — the rest take effect on the next play.
+
+`GameBootstrap` publishes the config at `DefaultExecutionOrder(-10000)`, because
+half the scene checks a toggle in its own `Awake` and Unity does not define the
+order those run in.
+
+### What the prototype actually is
+
+Stationary player, auto-fire, zombies arriving forever on an accelerating timer.
+A draft at 5 kills, another at 15, then 30/50/75. Three abilities, three levels
+each: Shockwave, Heavy Rounds, Trigger Work. Death restarts. Nothing persists.
+
+That is the thing being tested. If holding the ring is not fun at this size, no
+toggle on the list above changes the answer.
+
+## 2b. Status
 
 | System | Status |
 |---|---|

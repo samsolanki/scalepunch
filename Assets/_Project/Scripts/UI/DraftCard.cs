@@ -60,7 +60,11 @@ namespace ScalePunch.UI
 
             AbilityDefinition definition = offer.Definition;
             AbilityLevel data = definition.LevelData(offer.NextLevel);
-            Color rarityColour = RarityTable.Colour(offer.Rarity);
+
+            bool showRarity = Core.PrototypeConfig.Active.abilityRarity;
+            Color rarityColour = showRarity
+                ? RarityTable.Colour(offer.Rarity)
+                : new Color(0.55f, 0.60f, 0.68f);
 
             if (icon != null)
             {
@@ -75,6 +79,7 @@ namespace ScalePunch.UI
 
             if (rarityLabel != null)
             {
+                rarityLabel.gameObject.SetActive(showRarity);
                 rarityLabel.text = RarityTable.Label(offer.Rarity);
                 rarityLabel.color = rarityColour;
             }
@@ -89,7 +94,7 @@ namespace ScalePunch.UI
 
             if (glow != null)
             {
-                glow.enabled = RarityTable.Glows(offer.Rarity);
+                glow.enabled = showRarity && RarityTable.Glows(offer.Rarity);
                 glow.color = new Color(rarityColour.r, rarityColour.g, rarityColour.b, 0.55f);
             }
 

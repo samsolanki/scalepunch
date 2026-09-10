@@ -5,6 +5,7 @@ using ScalePunch.Combat;
 using ScalePunch.Core;
 using ScalePunch.Enemies;
 using ScalePunch.Meta;
+using ScalePunch.Core;
 using ScalePunch.Progression;
 using ScalePunch.Save;
 using ScalePunch.Stages;
@@ -46,6 +47,14 @@ namespace ScalePunch.Run
         float _endTimer;
         bool _ending;
         bool _paused;
+        bool _showEndScreen;
+        bool _bankEnabled;
+
+        void Awake()
+        {
+            _showEndScreen = PrototypeConfig.Active.runEndScreen;
+            _bankEnabled = bankRewards && PrototypeConfig.Active.saveAndCurrency;
+        }
 
         void OnEnable()
         {
@@ -86,6 +95,16 @@ namespace ScalePunch.Run
             if (_endTimer > 0f) return;
 
             _ending = false;
+
+            // Prototype: no end screen, so freezing would just strand the player
+            // on a dead scene with nothing to press. Restart straight into
+            // another run instead.
+            if (!_showEndScreen)
+            {
+                Restart();
+                return;
+            }
+
             Freeze();
             RunEnded?.Invoke(BuildResult());
         }
@@ -121,7 +140,9 @@ namespace ScalePunch.Run
             int level = levels != null ? levels.Level : 1;
             int coins = Payout();
 
-            long balance = bankRewards ? Bank(coins) : CurrencyService.Coins;
+            // Never touch CurrencyService when saving is off — reading a balance
+            // is enough to create a profile file on disk.
+            long balance = _bankEnabled ? Bank(coins) : 0L;
 
             return new RunResult(Outcome, Elapsed, Mathf.Min(waves, total), total,
                                  Kills, level, coins, balance);

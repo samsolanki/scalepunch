@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using ScalePunch.Combat;
+using ScalePunch.Core;
 using ScalePunch.Enemies;
 using ScalePunch.Player;
 using ScalePunch.Progression;
@@ -48,6 +49,10 @@ namespace ScalePunch.UI
         void Awake()
         {
             if (bossBanner != null) bossBanner.SetActive(false);
+
+            // No waves means no wave counter — a static "WAVE 1/8" that never
+            // moves is worse than no label at all.
+            if (waveLabel != null) waveLabel.gameObject.SetActive(PrototypeConfig.Active.waves);
         }
 
         void OnEnable()

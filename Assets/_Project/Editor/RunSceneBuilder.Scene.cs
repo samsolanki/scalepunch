@@ -579,6 +579,11 @@ namespace ScalePunch.EditorTools
         {
             var systems = new GameObject("Systems");
 
+            // First component on the object, and DefaultExecutionOrder -10000, so
+            // the config is published before anything else's Awake reads a toggle.
+            var bootstrap = systems.AddComponent<GameBootstrap>();
+            Set(bootstrap, "config", data.prototype);
+
             var time = systems.AddComponent<TimeController>();
             Set(time, "tuning", data.tuning);
 
@@ -598,6 +603,9 @@ namespace ScalePunch.EditorTools
             Set(spawner, "spawnRadius", SpawnRadius);
             Set(spawner, "maxConcurrent", 150);
             Set(spawner, "prewarmPerType", 24);
+            Set(spawner, "initialInterval", 1.4f);
+            Set(spawner, "minimumInterval", 0.25f);
+            Set(spawner, "secondsPerStep", 20f);
 
             var gems = systems.AddComponent<XPGemService>();
             Set(gems, "prefab", prefabs.gem);

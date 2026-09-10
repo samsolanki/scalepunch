@@ -156,8 +156,12 @@ namespace ScalePunch.Abilities
         AbilityOffer MakeOffer(AbilityDefinition definition, float luck)
         {
             AbilityInstance owned = abilities.Get(definition);
-            return new AbilityOffer(definition, RarityTable.Roll(luck),
-                                    owned != null ? owned.Level : 0);
+
+            AbilityRarity rarity = Core.PrototypeConfig.Active.abilityRarity
+                ? RarityTable.Roll(luck)
+                : AbilityRarity.Common;
+
+            return new AbilityOffer(definition, rarity, owned != null ? owned.Level : 0);
         }
 
         bool HoldsAnyActive()

@@ -19,6 +19,14 @@ namespace ScalePunch.Save
 
         void Awake()
         {
+            if (!Core.PrototypeConfig.Active.saveAndCurrency)
+            {
+                // Never touch SaveService here: loading is enough to write a
+                // profile to disk, and a prototype should leave nothing behind.
+                enabled = false;
+                return;
+            }
+
             // Touching Current forces the load early, so the first read is not a
             // file hit in the middle of gameplay.
             _ = SaveService.Current;
@@ -37,16 +45,20 @@ namespace ScalePunch.Save
             SaveService.Save();
         }
 
+        // These fire regardless of `enabled`, so each has to re-check.
         void OnApplicationPause(bool paused)
         {
-            if (paused) SaveService.Save();
+            if (paused && enabled) SaveService.Save();
         }
 
         void OnApplicationFocus(bool focused)
         {
-            if (!focused) SaveService.Save();
+            if (!focused && enabled) SaveService.Save();
         }
 
-        void OnApplicationQuit() => SaveService.Save();
+        void OnApplicationQuit()
+        {
+            if (enabled) SaveService.Save();
+        }
     }
 }
