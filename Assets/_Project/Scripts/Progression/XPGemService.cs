@@ -45,6 +45,11 @@ namespace ScalePunch.Progression
         {
             if (_pool == null || player == null || value <= 0) return;
 
+            // In Kills mode LevelSystem counts kills directly, so a gem would
+            // grant nothing. Spawning pickups that do not pay out teaches the
+            // player the wrong model of where progress comes from.
+            if (levelSystem != null && levelSystem.Source != ProgressSource.XPGems) return;
+
             if (_live.Count >= maxConcurrent)
             {
                 // Fold the value into an existing gem so XP is never lost, even

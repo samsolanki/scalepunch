@@ -33,6 +33,8 @@ three cards — the only interaction a run has.
 | Floating health bars (pooled, one canvas) | **BUILT** |
 | XP, gems, magnet, levelling | **BUILT** |
 | Ability draft, 8 abilities, 3 active effects | **BUILT** |
+| Draft rarity (5 tiers) + before/after card values | **BUILT** |
+| Kill-triggered drafts (5, 15, 30, …) | **BUILT** |
 | Run HUD: XP, health, timer, kills, priority toggle | **BUILT** |
 | Waves / stages | **BUILT** — 8 authored waves, ~3:30 |
 | Boss | **BUILT** — two phases, telegraphed charge |

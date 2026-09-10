@@ -31,10 +31,10 @@ namespace ScalePunch.Abilities
 
         /// <summary>Raised with the cards to show. The UI subscribes; this class
         /// never touches a Canvas.</summary>
-        public event Action<IReadOnlyList<AbilityDefinition>> OfferReady;
+        public event Action<IReadOnlyList<AbilityOffer>> OfferReady;
 
         readonly List<AbilityDefinition> _candidates = new(32);
-        readonly List<AbilityDefinition> _offer = new(4);
+        readonly List<AbilityOffer> _offer = new(4);
         readonly Queue<int> _pendingLevels = new();
 
         bool _drafting;
@@ -80,11 +80,11 @@ namespace ScalePunch.Abilities
         }
 
         /// <summary>Called by the UI when the player picks a card.</summary>
-        public void Choose(AbilityDefinition definition)
+        public void Choose(AbilityOffer offer)
         {
             if (!_drafting) return;
 
-            abilities.Grant(definition);
+            abilities.Grant(offer);
             _draftsTaken++;
             ShowNext();
         }
@@ -96,9 +96,11 @@ namespace ScalePunch.Abilities
 
             CollectCandidates();
 
+            float luck = stats != null ? stats.Get(StatType.Luck) : 0f;
+
             if (_candidates.Count == 0)
             {
-                if (library.fallback != null) _offer.Add(library.fallback);
+                if (library.fallback != null) _offer.Add(MakeOffer(library.fallback, luck));
                 return;
             }
 
@@ -107,19 +109,19 @@ namespace ScalePunch.Abilities
             if (_draftsTaken < guaranteeActiveWithinDrafts && !HoldsAnyActive())
             {
                 AbilityDefinition active = TakeWeighted(AbilityKind.Active);
-                if (active != null) _offer.Add(active);
+                if (active != null) _offer.Add(MakeOffer(active, luck));
             }
 
             while (_offer.Count < cardsPerDraft && _candidates.Count > 0)
             {
                 AbilityDefinition pick = TakeWeighted(null);
                 if (pick == null) break;
-                _offer.Add(pick);
+                _offer.Add(MakeOffer(pick, luck));
             }
 
             // Never show fewer than three cards — a short offer reads as a bug.
             while (_offer.Count < cardsPerDraft && library.fallback != null)
-                _offer.Add(library.fallback);
+                _offer.Add(MakeOffer(library.fallback, luck));
         }
 
         void CollectCandidates()
@@ -145,6 +147,17 @@ namespace ScalePunch.Abilities
                     _candidates.Add(definition);
                 }
             }
+        }
+
+        /// <summary>
+        /// Rarity is rolled per card at offer time, so the same ability is a
+        /// different card each time it appears.
+        /// </summary>
+        AbilityOffer MakeOffer(AbilityDefinition definition, float luck)
+        {
+            AbilityInstance owned = abilities.Get(definition);
+            return new AbilityOffer(definition, RarityTable.Roll(luck),
+                                    owned != null ? owned.Level : 0);
         }
 
         bool HoldsAnyActive()

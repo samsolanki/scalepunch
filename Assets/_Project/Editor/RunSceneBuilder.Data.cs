@@ -119,6 +119,12 @@ namespace ScalePunch.EditorTools
             // to correct for a Runner crossing the line of fire.
             set.pistol.steerDegreesPerSecond = 45f;
 
+            // Drafts fire on kill count, not collected XP, so a threshold reads
+            // as exactly what it says: the first card at 5 zombies, the second
+            // at 15. Gems stop spawning in this mode — see XPGemService.
+            set.curve.source = ProgressSource.Kills;
+            set.curve.cumulativeThresholds = new[] { 5, 15, 30, 50, 75, 105, 140, 180, 225, 275 };
+
             set.zombies = BuildZombies();
             set.boss = BuildBoss();
             set.waves = BuildWaves(set.zombies, set.boss);
@@ -133,6 +139,7 @@ namespace ScalePunch.EditorTools
                       $"runner {set.zombies[1].baseHP} HP, " +
                       $"brute {set.zombies[2].baseHP} HP / armour {set.zombies[2].armor}, " +
                       $"steer {set.pistol.steerDegreesPerSecond} deg/s, " +
+                      $"drafts at {string.Join('/', set.curve.cumulativeThresholds)} kills, " +
                       $"stage '{set.stage.id}' {set.stage.WaveCount} waves / " +
                       $"{set.stage.TotalWaveSeconds():0}s + boss {set.boss.baseHP} HP");
 

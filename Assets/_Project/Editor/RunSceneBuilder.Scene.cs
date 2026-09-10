@@ -45,7 +45,7 @@ namespace ScalePunch.EditorTools
 
             Canvas canvas = BuildCanvas(out RectTransform damageNumberRoot,
                                         out RectTransform healthBarRoot);
-            BuildDraftUI(canvas, draft, abilities, prefabs);
+            BuildDraftUI(canvas, draft, stats, prefabs);
 
             RunController run = BuildSystems(data, prefabs, player.transform, stats, levels,
                                              health, camera, damageNumberRoot, healthBarRoot);
@@ -505,7 +505,8 @@ namespace ScalePunch.EditorTools
             Set(toggle, "label", value);
         }
 
-        static void BuildDraftUI(Canvas canvas, DraftController draft, AbilitySystem abilities, PrefabSet prefabs)
+        static void BuildDraftUI(Canvas canvas, DraftController draft, PlayerStats stats,
+                                 PrefabSet prefabs)
         {
             // DraftScreen lives on an always-active root and toggles a child panel.
             // Putting it on the panel itself would mean OnEnable never runs while
@@ -561,7 +562,7 @@ namespace ScalePunch.EditorTools
 
             var screen = rootGo.AddComponent<DraftScreen>();
             Set(screen, "draft", draft);
-            Set(screen, "abilities", abilities);
+            Set(screen, "stats", stats);
             Set(screen, "panel", panelGo);
             Set(screen, "canvasGroup", group);
             SetArray(screen, "cards", cards);

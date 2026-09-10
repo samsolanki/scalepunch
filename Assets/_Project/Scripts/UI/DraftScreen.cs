@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using ScalePunch.Abilities;
+using ScalePunch.Player;
 
 namespace ScalePunch.UI
 {
@@ -11,7 +12,7 @@ namespace ScalePunch.UI
     public class DraftScreen : MonoBehaviour
     {
         [SerializeField] DraftController draft;
-        [SerializeField] AbilitySystem abilities;
+        [SerializeField] PlayerStats stats;
         [SerializeField] GameObject panel;
         [SerializeField] DraftCard[] cards;
         [SerializeField] CanvasGroup canvasGroup;
@@ -38,7 +39,7 @@ namespace ScalePunch.UI
             if (draft != null) draft.OfferReady -= Show;
         }
 
-        void Show(IReadOnlyList<AbilityDefinition> offer)
+        void Show(IReadOnlyList<AbilityOffer> offer)
         {
             if (panel != null) panel.SetActive(true);
 
@@ -48,8 +49,7 @@ namespace ScalePunch.UI
                 cards[i].gameObject.SetActive(hasCard);
                 if (!hasCard) continue;
 
-                AbilityInstance owned = abilities.Get(offer[i]);
-                cards[i].Bind(offer[i], owned != null ? owned.Level : 0, Choose);
+                cards[i].Bind(offer[i], stats.Stats, Choose);
             }
 
             _fadeElapsed = 0f;
@@ -69,12 +69,12 @@ namespace ScalePunch.UI
             if (t >= 1f) _fading = false;
         }
 
-        void Choose(AbilityDefinition definition)
+        void Choose(AbilityOffer offer)
         {
             // Hidden before Choose so a queued second level-up re-shows the panel
             // with fresh cards rather than leaving the old ones on screen.
             if (panel != null) panel.SetActive(false);
-            draft.Choose(definition);
+            draft.Choose(offer);
         }
     }
 }

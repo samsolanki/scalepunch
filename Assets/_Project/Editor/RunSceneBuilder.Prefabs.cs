@@ -339,7 +339,21 @@ namespace ScalePunch.EditorTools
         static DraftCard BuildDraftCard()
         {
             var root = new GameObject("DraftCard", typeof(RectTransform));
-            ((RectTransform)root.transform).sizeDelta = new Vector2(300f, 420f);
+            ((RectTransform)root.transform).sizeDelta = new Vector2(300f, 460f);
+
+            // Behind everything, and inactive unless the roll was Epic or above.
+            // Sits on the root so it reads as the whole card glowing rather than
+            // a rectangle behind it.
+            RectTransform glowRect = UIChild("Glow", root.transform);
+            glowRect.anchorMin = Vector2.zero;
+            glowRect.anchorMax = Vector2.one;
+            glowRect.offsetMin = new Vector2(-14f, -14f);
+            glowRect.offsetMax = new Vector2(14f, 14f);
+            var glow = glowRect.gameObject.AddComponent<Image>();
+            glow.sprite = UiSprite();
+            glow.type = Image.Type.Sliced;
+            glow.raycastTarget = false;
+            glow.enabled = false;
 
             var background = root.AddComponent<Image>();
             background.color = new Color(0.13f, 0.14f, 0.18f, 0.98f);
@@ -351,25 +365,37 @@ namespace ScalePunch.EditorTools
 
             var element = root.AddComponent<LayoutElement>();
             element.preferredWidth = 300f;
-            element.preferredHeight = 420f;
+            element.preferredHeight = 460f;
 
-            // A colour stripe along the top edge is the fastest read of active vs
-            // passive, which is the first thing a player sorts three cards by.
-            RectTransform stripeRect = UIChild("KindStripe", root.transform);
-            stripeRect.anchorMin = new Vector2(0f, 1f);
-            stripeRect.anchorMax = new Vector2(1f, 1f);
-            stripeRect.pivot = new Vector2(0.5f, 1f);
-            stripeRect.anchoredPosition = Vector2.zero;
-            stripeRect.sizeDelta = new Vector2(0f, 12f);
-            var stripe = stripeRect.gameObject.AddComponent<Image>();
-            stripe.raycastTarget = false;
+            // Rarity band along the top. Replaces the old active/passive stripe:
+            // rarity is the stronger sort now, and the kind is already obvious
+            // from the description.
+            RectTransform rarityRect = UIChild("RarityLabel", root.transform);
+            rarityRect.anchorMin = new Vector2(0f, 1f);
+            rarityRect.anchorMax = new Vector2(1f, 1f);
+            rarityRect.pivot = new Vector2(0.5f, 1f);
+            rarityRect.anchoredPosition = new Vector2(0f, -8f);
+            rarityRect.sizeDelta = new Vector2(-20f, 32f);
+            TextMeshProUGUI rarityLabel = Label(rarityRect.gameObject, 22f,
+                                                TextAlignmentOptions.Center, Color.white);
+            rarityLabel.fontStyle = FontStyles.Bold;
 
-            RectTransform iconRect = UIChild("Icon", root.transform);
-            iconRect.anchorMin = new Vector2(0.5f, 1f);
-            iconRect.anchorMax = new Vector2(0.5f, 1f);
-            iconRect.pivot = new Vector2(0.5f, 1f);
-            iconRect.anchoredPosition = new Vector2(0f, -36f);
-            iconRect.sizeDelta = new Vector2(110f, 110f);
+            RectTransform frameRect = UIChild("IconFrame", root.transform);
+            frameRect.anchorMin = new Vector2(0.5f, 1f);
+            frameRect.anchorMax = new Vector2(0.5f, 1f);
+            frameRect.pivot = new Vector2(0.5f, 1f);
+            frameRect.anchoredPosition = new Vector2(0f, -44f);
+            frameRect.sizeDelta = new Vector2(122f, 122f);
+            var iconFrame = frameRect.gameObject.AddComponent<Image>();
+            iconFrame.sprite = UiSprite();
+            iconFrame.type = Image.Type.Sliced;
+            iconFrame.raycastTarget = false;
+
+            RectTransform iconRect = UIChild("Icon", frameRect);
+            iconRect.anchorMin = Vector2.zero;
+            iconRect.anchorMax = Vector2.one;
+            iconRect.offsetMin = new Vector2(6f, 6f);
+            iconRect.offsetMax = new Vector2(-6f, -6f);
             var icon = iconRect.gameObject.AddComponent<Image>();
             icon.raycastTarget = false;
             icon.enabled = false;   // DraftCard re-enables it only when the ability has a sprite
@@ -378,7 +404,7 @@ namespace ScalePunch.EditorTools
             nameRect.anchorMin = new Vector2(0f, 1f);
             nameRect.anchorMax = new Vector2(1f, 1f);
             nameRect.pivot = new Vector2(0.5f, 1f);
-            nameRect.anchoredPosition = new Vector2(0f, -160f);
+            nameRect.anchoredPosition = new Vector2(0f, -176f);
             nameRect.sizeDelta = new Vector2(-30f, 50f);
             TextMeshProUGUI nameLabel = Label(nameRect.gameObject, 30f, TextAlignmentOptions.Center, Color.white);
             nameLabel.fontStyle = FontStyles.Bold;
@@ -387,29 +413,90 @@ namespace ScalePunch.EditorTools
             levelRect.anchorMin = new Vector2(0f, 1f);
             levelRect.anchorMax = new Vector2(1f, 1f);
             levelRect.pivot = new Vector2(0.5f, 1f);
-            levelRect.anchoredPosition = new Vector2(0f, -212f);
-            levelRect.sizeDelta = new Vector2(-30f, 36f);
+            levelRect.anchoredPosition = new Vector2(0f, -226f);
+            levelRect.sizeDelta = new Vector2(-30f, 34f);
             TextMeshProUGUI levelLabel = Label(levelRect.gameObject, 24f, TextAlignmentOptions.Center,
                                                new Color(0.65f, 0.72f, 0.80f));
 
             RectTransform descRect = UIChild("DescriptionLabel", root.transform);
-            descRect.anchorMin = Vector2.zero;
+            descRect.anchorMin = new Vector2(0f, 0f);
             descRect.anchorMax = new Vector2(1f, 0f);
             descRect.pivot = new Vector2(0.5f, 0f);
-            descRect.anchoredPosition = new Vector2(0f, 26f);
-            descRect.sizeDelta = new Vector2(-40f, 140f);
-            TextMeshProUGUI descLabel = Label(descRect.gameObject, 24f, TextAlignmentOptions.Top,
+            descRect.anchoredPosition = new Vector2(0f, 96f);
+            descRect.sizeDelta = new Vector2(-40f, 120f);
+            TextMeshProUGUI descLabel = Label(descRect.gameObject, 23f, TextAlignmentOptions.Top,
                                               new Color(0.85f, 0.88f, 0.92f));
+
+            GameObject valueRow = BuildValueRow(root.transform,
+                                                out TextMeshProUGUI before,
+                                                out TextMeshProUGUI arrow,
+                                                out TextMeshProUGUI after);
 
             var card = root.AddComponent<DraftCard>();
             Set(card, "button", button);
+            Set(card, "background", background);
             Set(card, "icon", icon);
+            Set(card, "iconFrame", iconFrame);
             Set(card, "nameLabel", nameLabel);
             Set(card, "levelLabel", levelLabel);
             Set(card, "descriptionLabel", descLabel);
-            Set(card, "kindStripe", stripe);
+            Set(card, "rarityLabel", rarityLabel);
+            Set(card, "glow", glow);
+            Set(card, "valueRow", valueRow);
+            Set(card, "beforeLabel", before);
+            Set(card, "arrowLabel", arrow);
+            Set(card, "afterLabel", after);
 
             return SavePrefab<DraftCard>(root, "DraftCard");
+        }
+
+        /// <summary>
+        /// The "0.75 → 0.68" strip along the bottom of a card. Its own dark
+        /// plate, because it is the row players actually read and it has to
+        /// survive whatever rarity colour the card body is tinted with.
+        /// </summary>
+        static GameObject BuildValueRow(Transform parent, out TextMeshProUGUI before,
+                                        out TextMeshProUGUI arrow, out TextMeshProUGUI after)
+        {
+            RectTransform rowRect = UIChild("ValueRow", parent);
+            rowRect.anchorMin = new Vector2(0f, 0f);
+            rowRect.anchorMax = new Vector2(1f, 0f);
+            rowRect.pivot = new Vector2(0.5f, 0f);
+            rowRect.anchoredPosition = new Vector2(0f, 24f);
+            rowRect.sizeDelta = new Vector2(-30f, 60f);
+
+            var plate = rowRect.gameObject.AddComponent<Image>();
+            plate.sprite = UiSprite();
+            plate.type = Image.Type.Sliced;
+            plate.color = new Color(0.05f, 0.05f, 0.07f, 0.85f);
+            plate.raycastTarget = false;
+
+            RectTransform beforeRect = UIChild("Before", rowRect);
+            beforeRect.anchorMin = new Vector2(0f, 0f);
+            beforeRect.anchorMax = new Vector2(0.42f, 1f);
+            beforeRect.offsetMin = Vector2.zero;
+            beforeRect.offsetMax = Vector2.zero;
+            before = Label(beforeRect.gameObject, 28f, TextAlignmentOptions.Right,
+                           new Color(0.85f, 0.87f, 0.9f));
+
+            RectTransform arrowRect = UIChild("Arrow", rowRect);
+            arrowRect.anchorMin = new Vector2(0.42f, 0f);
+            arrowRect.anchorMax = new Vector2(0.58f, 1f);
+            arrowRect.offsetMin = Vector2.zero;
+            arrowRect.offsetMax = Vector2.zero;
+            arrow = Label(arrowRect.gameObject, 26f, TextAlignmentOptions.Center,
+                          new Color(0.55f, 0.58f, 0.62f));
+
+            RectTransform afterRect = UIChild("After", rowRect);
+            afterRect.anchorMin = new Vector2(0.58f, 0f);
+            afterRect.anchorMax = new Vector2(1f, 1f);
+            afterRect.offsetMin = Vector2.zero;
+            afterRect.offsetMax = Vector2.zero;
+            after = Label(afterRect.gameObject, 28f, TextAlignmentOptions.Left,
+                          new Color(0.35f, 0.95f, 0.4f));
+            after.fontStyle = FontStyles.Bold;
+
+            return rowRect.gameObject;
         }
     }
 }
