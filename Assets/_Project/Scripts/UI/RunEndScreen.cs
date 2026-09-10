@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using ScalePunch.Meta;
 using ScalePunch.Run;
 
 namespace ScalePunch.UI
@@ -23,6 +24,7 @@ namespace ScalePunch.UI
         [SerializeField] TMP_Text subtitleLabel;
         [SerializeField] TMP_Text statsLabel;
         [SerializeField] TMP_Text coinsLabel;
+        [SerializeField] TMP_Text balanceLabel;
 
         [Header("Buttons")]
         [SerializeField] Button retryButton;
@@ -79,6 +81,11 @@ namespace ScalePunch.UI
                     $"Waves     {result.WavesSurvived}/{result.TotalWaves}";
 
             if (coinsLabel != null) coinsLabel.text = $"+{result.Coins}";
+
+            // The new total, beside the gain. A reward with no running balance
+            // beside it does not read as progress toward anything.
+            if (balanceLabel != null)
+                balanceLabel.text = $"{CurrencyService.Format(result.CoinBalance)} total";
 
             _fadeElapsed = 0f;
             _fading = fadeSeconds > 0f && canvasGroup != null;

@@ -38,7 +38,9 @@ three cards — the only interaction a run has.
 | Boss | **BUILT** — two phases, telegraphed charge |
 | Run end (win/lose) | **BUILT** — end screen, payout, retry |
 | **Audio** | **DESIGNED** — *no audio system exists at all* |
-| Currencies, gear, base rooms, save | **DESIGNED** — zero code |
+| Currencies (coins/gems/scrap) | **BUILT** — no sink until P6 |
+| Save / load + migrations | **BUILT** — local only, no cloud save |
+| Gear, base rooms | **DESIGNED** — zero code |
 | Ads / IAP / analytics | **DESIGNED** — M4 |
 | Energy system | **NOT PLANNED** — rejected, see §5 |
 | Skill tree | **NOT PLANNED** — see §5 |
@@ -78,15 +80,19 @@ Still open from P1: **return-to-meta** has nowhere to return to until P2 builds
 a meta scene, and the payout is **computed and displayed but not banked** —
 `RunController.Payout()` is the seam a `CurrencyService` plugs into.
 
-### P2 — Persistence and rewards
+### P2 — Persistence and rewards — **DONE**
 
-Closing the app currently erases everything.
+- [x] `CurrencyService`: coins, gems, scrap, all through Earn/Spend with
+      analytics-ready reason tags
+- [x] Run payout banked on win and loss, written to disk immediately
+- [x] `SaveService`: versioned JSON, atomic writes, one backup, checksummed,
+      **with the migrations chain in place from day one**
+- [x] Editor tools for wiping and inspecting the profile
+- [ ] **Cloud save** — needs Google Play Games / Firebase; moved to M4 with the
+      rest of the SDK work. Must ship before launch
 
-- [ ] `CurrencyService`: coins, gems, scrap
-- [ ] Run payout on win and loss
-- [ ] `SaveService`: versioned JSON **with a migrations class from day one**.
-      The first post-launch save-shape change without one wipes every account
-- [ ] Cloud save before launch — device loss is a top-3 one-star review cause
+See [`docs/07-save-and-currency.md`](07-save-and-currency.md). Coins have no
+sink until P6, so do not tune `coinsOnClear` seriously yet.
 
 ### P3 — Audio (nothing exists)
 

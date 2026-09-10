@@ -342,6 +342,7 @@ namespace ScalePunch.EditorTools
 
             stage.id = "stage_01";
             stage.displayName = "Stage 1";
+            stage.stageNumber = 1;
             stage.waves = waves;
             stage.boss = boss;
             stage.bossIntroSeconds = 2.5f;

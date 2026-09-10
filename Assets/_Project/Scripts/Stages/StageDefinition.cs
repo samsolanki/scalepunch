@@ -19,6 +19,9 @@ namespace ScalePunch.Stages
         [Header("Identity")]
         public string id = "stage_01";
         public string displayName = "Stage 1";
+        [Tooltip("1-based position in the campaign. Recorded as highestStageCleared " +
+                 "on a win, so it must be unique and ordered across stages.")]
+        public int stageNumber = 1;
 
         [Header("Content")]
         public WaveDefinition[] waves = new WaveDefinition[0];

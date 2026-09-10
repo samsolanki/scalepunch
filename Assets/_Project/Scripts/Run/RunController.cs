@@ -4,7 +4,9 @@ using UnityEngine.SceneManagement;
 using ScalePunch.Combat;
 using ScalePunch.Core;
 using ScalePunch.Enemies;
+using ScalePunch.Meta;
 using ScalePunch.Progression;
+using ScalePunch.Save;
 using ScalePunch.Stages;
 
 namespace ScalePunch.Run
@@ -26,6 +28,10 @@ namespace ScalePunch.Run
         [Tooltip("Seconds between the run ending and the screen appearing. The beat " +
                  "lets the killing blow land before the UI covers it.")]
         [SerializeField] float endDelaySeconds = 0.9f;
+
+        [Tooltip("Bank the payout and write the profile when the run ends. Turn off " +
+                 "for balance testing so throwaway runs do not inflate a real save.")]
+        [SerializeField] bool bankRewards = true;
 
         public event Action<RunResult> RunEnded;
         /// <summary>Wave index and total, forwarded from the spawner for the HUD.</summary>
@@ -113,9 +119,42 @@ namespace ScalePunch.Run
             int waves = spawner != null ? spawner.CurrentWaveNumber : 0;
             int total = spawner != null ? spawner.TotalWaves : 0;
             int level = levels != null ? levels.Level : 1;
+            int coins = Payout();
+
+            long balance = bankRewards ? Bank(coins) : CurrencyService.Coins;
 
             return new RunResult(Outcome, Elapsed, Mathf.Min(waves, total), total,
-                                 Kills, level, Payout());
+                                 Kills, level, coins, balance);
+        }
+
+        /// <summary>
+        /// Deposits the payout, records the run against the profile, and writes
+        /// to disk immediately.
+        ///
+        /// Saving here rather than on a timer matters: the end screen is exactly
+        /// where players close the app, and a run whose reward is not on disk by
+        /// then never happened as far as the player is concerned.
+        /// </summary>
+        long Bank(int coins)
+        {
+            SaveData profile = SaveService.Current;
+
+            profile.totalRuns++;
+            profile.totalKills += Kills;
+
+            if (Outcome == RunOutcome.Victory)
+            {
+                profile.totalVictories++;
+
+                if (stage != null)
+                    profile.highestStageCleared = Mathf.Max(profile.highestStageCleared, stage.stageNumber);
+            }
+
+            CurrencyService.Earn(CurrencyType.Coins, coins,
+                                 Outcome == RunOutcome.Victory ? "run_victory" : "run_defeat");
+
+            SaveService.Save();
+            return CurrencyService.Coins;
         }
 
         /// <summary>

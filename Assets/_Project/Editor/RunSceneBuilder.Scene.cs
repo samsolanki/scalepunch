@@ -16,6 +16,7 @@ using ScalePunch.Player;
 using ScalePunch.Progression;
 using ScalePunch.Stages;
 using ScalePunch.Run;
+using ScalePunch.Save;
 using ScalePunch.UI;
 using ScalePunch.Weapons;
 
@@ -423,6 +424,10 @@ namespace ScalePunch.EditorTools
                 new Vector2(0f, -170f), new Vector2(600f, 90f), 56f, TextAlignmentOptions.Center, "+0");
             coins.color = new Color(1f, 0.82f, 0.3f);
 
+            TextMeshProUGUI balance = HudText("Balance", panel.transform, new Vector2(0.5f, 0.5f),
+                new Vector2(0f, -228f), new Vector2(600f, 50f), 28f, TextAlignmentOptions.Center, "0 total");
+            balance.color = new Color(0.68f, 0.7f, 0.76f);
+
             Button retry = BuildTextButton("RetryButton", panel.transform,
                                            new Vector2(0.5f, 0.5f), new Vector2(0f, -320f),
                                            new Vector2(420f, 110f), "RETRY");
@@ -435,6 +440,7 @@ namespace ScalePunch.EditorTools
             Set(screen, "subtitleLabel", subtitle);
             Set(screen, "statsLabel", stats);
             Set(screen, "coinsLabel", coins);
+            Set(screen, "balanceLabel", balance);
             Set(screen, "retryButton", retry);
 
             // Inactive last: RunEndScreen.Awake also does this, but leaving the
@@ -575,6 +581,12 @@ namespace ScalePunch.EditorTools
             var time = systems.AddComponent<TimeController>();
             Set(time, "tuning", data.tuning);
 
+            // Loads the profile at Awake and writes it on pause, focus loss and
+            // quit. OnApplicationPause is the one that matters: mobile can kill a
+            // backgrounded app without ever calling OnApplicationQuit.
+            var saveHooks = systems.AddComponent<SaveHooks>();
+            Set(saveHooks, "autosaveSeconds", 60f);
+
             systems.AddComponent<ProjectileService>();
 
             // The spawner no longer owns pacing — the stage does. Waves, boss and
@@ -613,6 +625,7 @@ namespace ScalePunch.EditorTools
             Set(run, "spawner", spawner);
             Set(run, "levels", levels);
             Set(run, "endDelaySeconds", 0.9f);
+            Set(run, "bankRewards", true);
 
             return run;
         }
