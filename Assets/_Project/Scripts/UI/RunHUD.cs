@@ -5,6 +5,7 @@ using ScalePunch.Combat;
 using ScalePunch.Enemies;
 using ScalePunch.Player;
 using ScalePunch.Progression;
+using ScalePunch.Run;
 
 namespace ScalePunch.UI
 {
@@ -21,6 +22,7 @@ namespace ScalePunch.UI
         [SerializeField] LevelSystem levels;
         [SerializeField] Health playerHealth;
         [SerializeField] AutoShoot weapon;
+        [SerializeField] RunController run;
 
         [Header("XP")]
         [SerializeField] Image xpFill;
@@ -33,29 +35,74 @@ namespace ScalePunch.UI
         [Header("Run")]
         [SerializeField] TMP_Text timerLabel;
         [SerializeField] TMP_Text killsLabel;
+        [SerializeField] TMP_Text waveLabel;
+
+        [Header("Boss")]
+        [SerializeField] GameObject bossBanner;
+        [SerializeField] float bossBannerSeconds = 2.5f;
 
         float _elapsed;
         int _kills;
+        float _bannerRemaining;
+
+        void Awake()
+        {
+            if (bossBanner != null) bossBanner.SetActive(false);
+        }
 
         void OnEnable()
         {
             if (playerHealth != null) playerHealth.Died += OnPlayerDied;
             EnemyRegistry.Killed += OnKill;
+
+            if (run != null)
+            {
+                run.WaveStarted += OnWaveStarted;
+                run.BossSpawned += OnBossSpawned;
+            }
         }
 
         void OnDisable()
         {
             if (playerHealth != null) playerHealth.Died -= OnPlayerDied;
             EnemyRegistry.Killed -= OnKill;
+
+            if (run != null)
+            {
+                run.WaveStarted -= OnWaveStarted;
+                run.BossSpawned -= OnBossSpawned;
+            }
         }
 
         void OnPlayerDied(DamageInfo info) => enabled = false;
         void OnKill(Enemy enemy) => _kills++;
 
+        void OnWaveStarted(int index, int total)
+        {
+            if (waveLabel != null) waveLabel.text = $"WAVE {index + 1}/{total}";
+        }
+
+        void OnBossSpawned(Enemy boss)
+        {
+            if (waveLabel != null) waveLabel.text = "BOSS";
+            if (bossBanner == null) return;
+
+            bossBanner.SetActive(true);
+            _bannerRemaining = bossBannerSeconds;
+        }
+
         void Update()
         {
             // Scaled, so the run clock stops during a draft and during hitstop.
             _elapsed += Time.deltaTime;
+
+            if (_bannerRemaining > 0f)
+            {
+                // Unscaled: the banner must still time out if it lands on a
+                // hitstop frame.
+                _bannerRemaining -= Time.unscaledDeltaTime;
+                if (_bannerRemaining <= 0f && bossBanner != null) bossBanner.SetActive(false);
+            }
 
             if (levels != null)
             {

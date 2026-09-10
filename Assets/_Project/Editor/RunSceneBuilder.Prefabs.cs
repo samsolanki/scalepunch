@@ -21,6 +21,7 @@ namespace ScalePunch.EditorTools
             public Projectile bullet;
             public XPGem gem;
             public Enemy zombie;
+            public Enemy boss;
             public DamageNumber damageNumber;
             public DraftCard draftCard;
             public HealthBarWidget healthBar;
@@ -93,6 +94,7 @@ namespace ScalePunch.EditorTools
             set.bullet = Keep(LoadPrefab<Projectile>("Projectile_Bullet"), set.bullet);
             set.gem = Keep(LoadPrefab<XPGem>("XPGem"), set.gem);
             set.zombie = Keep(LoadPrefab<Enemy>("Zombie"), set.zombie);
+            set.boss = Keep(LoadPrefab<Enemy>("Zombie_Boss"), set.boss);
             set.damageNumber = Keep(LoadPrefab<DamageNumber>("DamageNumber"), set.damageNumber);
             set.draftCard = Keep(LoadPrefab<DraftCard>("DraftCard"), set.draftCard);
             set.healthBar = Keep(LoadPrefab<HealthBarWidget>("HealthBar"), set.healthBar);
@@ -105,6 +107,7 @@ namespace ScalePunch.EditorTools
                 bullet = BuildBullet(mats),
                 gem = BuildGem(mats),
                 zombie = BuildZombiePrefab(data, mats),
+                boss = BuildBossPrefab(data, mats),
                 damageNumber = BuildDamageNumber(),
                 draftCard = BuildDraftCard(),
                 healthBar = BuildHealthBar()
@@ -116,6 +119,14 @@ namespace ScalePunch.EditorTools
             {
                 def.prefab = set.zombie;
                 EditorUtility.SetDirty(def);
+            }
+
+            // The boss has its own prefab because it carries BossController; the
+            // three ordinary tiers still share one.
+            if (data.boss != null)
+            {
+                data.boss.prefab = set.boss;
+                EditorUtility.SetDirty(data.boss);
             }
 
             data.pistol.projectilePrefab = set.bullet;
@@ -211,6 +222,64 @@ namespace ScalePunch.EditorTools
             Set(feedback, "numberHeight", 1.7f);
 
             return SavePrefab<Enemy>(go, "Zombie");
+        }
+
+        /// <summary>
+        /// The zombie prefab plus a BossController and its own material, saved
+        /// separately so the pool can hand out a boss without every shambler
+        /// carrying a boss brain it never uses.
+        /// </summary>
+        static Enemy BuildBossPrefab(DataSet data, MaterialSet mats)
+        {
+            var go = new GameObject("Zombie_Boss");
+
+            GameObject body = Primitive(PrimitiveType.Capsule, "Body", mats.brute);
+            body.transform.SetParent(go.transform, false);
+            body.transform.localPosition = new Vector3(0f, 1f, 0f);
+
+            var health = go.AddComponent<Health>();
+            var movement = go.AddComponent<EnemyMovement>();
+            var enemy = go.AddComponent<Enemy>();
+            var flash = go.AddComponent<HitFlash>();
+            var feedback = go.AddComponent<CombatFeedback>();
+            var flinch = go.AddComponent<HitFlinch>();
+            var bar = go.AddComponent<HealthBarTarget>();
+            var boss = go.AddComponent<BossController>();
+
+            Set(flinch, "health", health);
+            Set(flinch, "body", body.transform);
+            // Half a normal zombie's lean: a boss that rocks as hard as a
+            // shambler reads as light, however much HP it has.
+            Set(flinch, "tiltDegrees", 10f);
+            Set(flinch, "critTiltDegrees", 16f);
+            Set(flinch, "recoverSpeed", 6f);
+
+            Set(bar, "health", health);
+            Set(bar, "heightOffset", 3.4f);
+            Set(bar, "width", 200f);
+            Set(bar, "hideWhenFull", false);
+            // Above every other bar: at the boss wave the screen is full, and the
+            // one bar that matters must survive the budget cut.
+            Set(bar, "priority", 100);
+
+            Set(enemy, "health", health);
+            Set(enemy, "movement", movement);
+
+            Set(flash, "tuning", data.tuning);
+            SetArray(flash, "renderers", new Object[] { body.GetComponent<Renderer>() });
+
+            Set(feedback, "tuning", data.tuning);
+            Set(feedback, "health", health);
+            Set(feedback, "flash", flash);
+            Set(feedback, "movement", movement);
+            Set(feedback, "numberHeight", 3.0f);
+
+            Set(boss, "enemy", enemy);
+            Set(boss, "movement", movement);
+            Set(boss, "health", health);
+            Set(boss, "body", body.transform);
+
+            return SavePrefab<Enemy>(go, "Zombie_Boss");
         }
 
         static DamageNumber BuildDamageNumber()

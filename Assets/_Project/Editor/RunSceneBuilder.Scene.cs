@@ -14,6 +14,8 @@ using ScalePunch.Enemies;
 using ScalePunch.Feedback;
 using ScalePunch.Player;
 using ScalePunch.Progression;
+using ScalePunch.Stages;
+using ScalePunch.Run;
 using ScalePunch.UI;
 using ScalePunch.Weapons;
 
@@ -42,11 +44,13 @@ namespace ScalePunch.EditorTools
 
             Canvas canvas = BuildCanvas(out RectTransform damageNumberRoot,
                                         out RectTransform healthBarRoot);
-            BuildHUD(canvas, levels, health, weapon);
             BuildDraftUI(canvas, draft, abilities, prefabs);
 
-            BuildSystems(data, prefabs, player.transform, stats, levels, camera,
-                         damageNumberRoot, healthBarRoot);
+            RunController run = BuildSystems(data, prefabs, player.transform, stats, levels,
+                                             health, camera, damageNumberRoot, healthBarRoot);
+
+            BuildHUD(canvas, levels, health, weapon, run);
+            BuildRunEndUI(canvas, run);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -309,7 +313,8 @@ namespace ScalePunch.EditorTools
             return text;
         }
 
-        static void BuildHUD(Canvas canvas, LevelSystem levels, Health health, AutoShoot weapon)
+        static void BuildHUD(Canvas canvas, LevelSystem levels, Health health, AutoShoot weapon,
+                             RunController run)
         {
             var hudGo = new GameObject("HUD", typeof(RectTransform));
             hudGo.transform.SetParent(canvas.transform, false);
@@ -330,6 +335,14 @@ namespace ScalePunch.EditorTools
             TextMeshProUGUI killsLabel = HudText("KillsLabel", hud, new Vector2(1f, 1f),
                 new Vector2(-40f, -52f), new Vector2(200f, 50f), 32f, TextAlignmentOptions.Right, "0");
 
+            // Under the timer: the wave counter is the run's progress bar, and
+            // without it a four-minute stage has no visible shape at all.
+            TextMeshProUGUI waveLabel = HudText("WaveLabel", hud, new Vector2(0.5f, 1f),
+                new Vector2(0f, -96f), new Vector2(420f, 44f), 26f, TextAlignmentOptions.Center, "WAVE 1/8");
+            waveLabel.color = new Color(0.75f, 0.78f, 0.85f);
+
+            GameObject bossBanner = BuildBossBanner(hud);
+
             Bar("HealthBar", hud, new Vector2(0f, 0f), new Vector2(40f, 40f), new Vector2(440f, 34f),
                 new Color(0.08f, 0.09f, 0.12f, 0.9f), new Color(0.9f, 0.3f, 0.32f), out Image healthFill);
 
@@ -346,8 +359,110 @@ namespace ScalePunch.EditorTools
             Set(runHud, "healthLabel", healthLabel);
             Set(runHud, "timerLabel", timerLabel);
             Set(runHud, "killsLabel", killsLabel);
+            Set(runHud, "waveLabel", waveLabel);
+            Set(runHud, "bossBanner", bossBanner);
+            Set(runHud, "bossBannerSeconds", 2.5f);
+            Set(runHud, "run", run);
 
             BuildPriorityButton(hud, weapon);
+        }
+
+        /// <summary>
+        /// The one moment the run announces itself. Starts inactive; RunHUD shows
+        /// it when the boss spawns and hides it on a timer.
+        /// </summary>
+        static GameObject BuildBossBanner(Transform hud)
+        {
+            var go = new GameObject("BossBanner", typeof(RectTransform));
+            go.transform.SetParent(hud, false);
+            Place((RectTransform)go.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 160f),
+                  new Vector2(900f, 120f));
+
+            TextMeshProUGUI text = Label(go, 72f, TextAlignmentOptions.Center, new Color(0.95f, 0.25f, 0.25f));
+            text.text = "BOSS";
+            text.fontStyle = FontStyles.Bold;
+
+            go.SetActive(false);
+            return go;
+        }
+
+        // ----------------------------------------------------------- run end
+
+        static void BuildRunEndUI(Canvas canvas, RunController run)
+        {
+            // Same shape as BuildDraftUI: the component sits on an always-active
+            // root and toggles a child panel. On the panel itself, OnEnable would
+            // never run while it starts hidden, so it would never subscribe to
+            // RunEnded and the end screen would silently never appear.
+            var rootGo = new GameObject("RunEndRoot", typeof(RectTransform));
+            rootGo.transform.SetParent(canvas.transform, false);
+            Stretch((RectTransform)rootGo.transform);
+
+            var panel = new GameObject("Panel", typeof(RectTransform), typeof(CanvasGroup));
+            panel.transform.SetParent(rootGo.transform, false);
+            Stretch((RectTransform)panel.transform);
+
+            var dim = panel.AddComponent<Image>();
+            dim.color = new Color(0.03f, 0.04f, 0.06f, 0.92f);
+            dim.sprite = UiSprite();
+
+            TextMeshProUGUI title = HudText("Title", panel.transform, new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 300f), new Vector2(900f, 130f), 84f, TextAlignmentOptions.Center, "STAGE CLEAR");
+            title.fontStyle = FontStyles.Bold;
+
+            TextMeshProUGUI subtitle = HudText("Subtitle", panel.transform, new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 200f), new Vector2(900f, 60f), 34f, TextAlignmentOptions.Center, "");
+            subtitle.color = new Color(0.72f, 0.75f, 0.82f);
+
+            // Monospaced-ish block via a left-aligned multi-line label: the rows
+            // line up because every label is padded in RunEndScreen, not here.
+            TextMeshProUGUI stats = HudText("Stats", panel.transform, new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 40f), new Vector2(560f, 260f), 34f, TextAlignmentOptions.TopLeft, "");
+
+            TextMeshProUGUI coins = HudText("Coins", panel.transform, new Vector2(0.5f, 0.5f),
+                new Vector2(0f, -170f), new Vector2(600f, 90f), 56f, TextAlignmentOptions.Center, "+0");
+            coins.color = new Color(1f, 0.82f, 0.3f);
+
+            Button retry = BuildTextButton("RetryButton", panel.transform,
+                                           new Vector2(0.5f, 0.5f), new Vector2(0f, -320f),
+                                           new Vector2(420f, 110f), "RETRY");
+
+            var screen = rootGo.AddComponent<RunEndScreen>();
+            Set(screen, "run", run);
+            Set(screen, "panel", panel);
+            Set(screen, "canvasGroup", panel.GetComponent<CanvasGroup>());
+            Set(screen, "titleLabel", title);
+            Set(screen, "subtitleLabel", subtitle);
+            Set(screen, "statsLabel", stats);
+            Set(screen, "coinsLabel", coins);
+            Set(screen, "retryButton", retry);
+
+            // Inactive last: RunEndScreen.Awake also does this, but leaving the
+            // authored scene with a full-screen black panel switched on makes the
+            // scene unusable to edit.
+            panel.SetActive(false);
+        }
+
+        static Button BuildTextButton(string name, Transform parent, Vector2 anchor,
+                                      Vector2 position, Vector2 size, string caption)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            Place((RectTransform)go.transform, anchor, position, size);
+
+            var image = go.AddComponent<Image>();
+            image.sprite = UiSprite();
+            image.color = new Color(0.16f, 0.19f, 0.26f, 1f);
+
+            var button = go.AddComponent<Button>();
+            button.targetGraphic = image;
+
+            RectTransform labelRect = UIChild("Label", go.transform);
+            Stretch(labelRect);
+            TextMeshProUGUI label = Label(labelRect.gameObject, 40f, TextAlignmentOptions.Center, Color.white);
+            label.text = caption;
+
+            return button;
         }
 
         static void BuildPriorityButton(Transform hud, AutoShoot weapon)
@@ -450,9 +565,10 @@ namespace ScalePunch.EditorTools
 
         // -------------------------------------------------------------- systems
 
-        static void BuildSystems(DataSet data, PrefabSet prefabs, Transform player,
-                                 PlayerStats stats, LevelSystem levels, Camera camera,
-                                 RectTransform damageNumberRoot, RectTransform healthBarRoot)
+        static RunController BuildSystems(DataSet data, PrefabSet prefabs, Transform player,
+                                          PlayerStats stats, LevelSystem levels, Health playerHealth,
+                                          Camera camera, RectTransform damageNumberRoot,
+                                          RectTransform healthBarRoot)
         {
             var systems = new GameObject("Systems");
 
@@ -461,19 +577,14 @@ namespace ScalePunch.EditorTools
 
             systems.AddComponent<ProjectileService>();
 
+            // The spawner no longer owns pacing — the stage does. Waves, boss and
+            // reward numbers all come off the StageDefinition asset.
             var spawner = systems.AddComponent<EnemySpawner>();
+            Set(spawner, "stage", data.stage);
             Set(spawner, "target", player);
             Set(spawner, "spawnRadius", SpawnRadius);
-            Set(spawner, "initialInterval", 1.4f);
-            Set(spawner, "minimumInterval", 0.18f);
-            Set(spawner, "secondsPerWave", 20f);
-            Set(spawner, "stageMultiplier", 1f);
             Set(spawner, "maxConcurrent", 150);
             Set(spawner, "prewarmPerType", 24);
-
-            var definitions = new Object[data.zombies.Length];
-            for (int i = 0; i < data.zombies.Length; i++) definitions[i] = data.zombies[i];
-            SetArray(spawner, "definitions", definitions);
 
             var gems = systems.AddComponent<XPGemService>();
             Set(gems, "prefab", prefabs.gem);
@@ -495,6 +606,15 @@ namespace ScalePunch.EditorTools
             Set(bars, "canvasRoot", healthBarRoot);
             Set(bars, "worldCamera", camera);
             Set(bars, "maxConcurrent", 24);
+
+            var run = systems.AddComponent<RunController>();
+            Set(run, "stage", data.stage);
+            Set(run, "playerHealth", playerHealth);
+            Set(run, "spawner", spawner);
+            Set(run, "levels", levels);
+            Set(run, "endDelaySeconds", 0.9f);
+
+            return run;
         }
 
         static void RegisterInBuildSettings()

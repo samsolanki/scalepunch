@@ -39,11 +39,11 @@ fire rate, radius, projectile speed, knockback and hitstop until it is.
 - [x] `AbilityDefinition` ScriptableObjects; **8 abilities** (3 active, 5 passive)
 - [x] Target-priority toggle on the HUD (closest / advanced / weakest / toughest)
 - [x] Ability runtime: cooldowns, levels, stat recalculation
-- [ ] Wave timeline from `WaveDefinition`; 8 waves over ~4 min
+- [x] Wave timeline from `WaveDefinition`; 8 waves over ~4 min
 - [ ] 4 zombie types (Shambler, Runner, Brute, Spitter — the Spitter needs
       ranged-attack code, the others are stat variants)
-- [ ] One boss with two phases and telegraphed attacks
-- [ ] Victory + defeat screens with a reward summary
+- [x] One boss with two phases and telegraphed attacks
+- [x] Victory + defeat screens with a reward summary
 - [ ] Object pooling pass across enemies, gems, VFX, numbers
 
 **Exit test:** you play five runs back to back voluntarily and take different

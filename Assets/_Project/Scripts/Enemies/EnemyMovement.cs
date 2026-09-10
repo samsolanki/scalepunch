@@ -24,18 +24,55 @@ namespace ScalePunch.Enemies
         Transform _target;
         Health _targetHealth;
         float _damage;
+        float _baseDamage;
+        float _speedMultiplier = 1f;
         float _attackTimer;
         Vector3 _knockbackVelocity;
         int _separationCursor;
+
+        /// <summary>Who this zombie is walking toward. Scripted behaviours (the
+        /// boss charge) need it and should not re-find the player themselves.</summary>
+        public Transform Target { get; private set; }
+
+        /// <summary>
+        /// While true this component stops driving the transform entirely, so a
+        /// scripted behaviour can move the body without the two fighting each
+        /// other for the same position every frame.
+        /// </summary>
+        public bool ExternalControl { get; set; }
+
+        public float Damage => _damage;
 
         public void Configure(EnemyDefinition definition, float damage, Transform target)
         {
             _definition = definition;
             _damage = damage;
+            _baseDamage = damage;
+            _speedMultiplier = 1f;
             _target = target;
+            Target = target;
             _targetHealth = target != null ? target.GetComponent<Health>() : null;
             _attackTimer = 0f;
             _knockbackVelocity = Vector3.zero;
+            ExternalControl = false;
+        }
+
+        /// <summary>Retunes speed and damage mid-life. The boss uses this on its
+        /// phase change rather than being respawned as a different definition.</summary>
+        public void SetSpeedAndDamage(float speedMultiplier, float damageMultiplier)
+        {
+            _speedMultiplier = Mathf.Max(0.1f, speedMultiplier);
+            _damage = _baseDamage * Mathf.Max(0.1f, damageMultiplier);
+        }
+
+        /// <summary>Applies contact damage on demand — the boss charge deals its
+        /// own damage rather than waiting for the melee interval.</summary>
+        public bool TryDamageTarget(float amount)
+        {
+            if (_targetHealth == null || _targetHealth.IsDead) return false;
+
+            _targetHealth.TakeDamage(new DamageInfo(amount, false, transform.position, gameObject));
+            return true;
         }
 
         public void ApplyKnockback(Vector3 direction, float force)
@@ -52,6 +89,7 @@ namespace ScalePunch.Enemies
         void Update()
         {
             if (_definition == null || _target == null) return;
+            if (ExternalControl) return;
 
             float dt = Time.deltaTime;
             Vector3 position = transform.position;
@@ -69,7 +107,7 @@ namespace ScalePunch.Enemies
             }
             else if (distance > _definition.attackRange)
             {
-                Vector3 step = toTarget.normalized * (_definition.moveSpeed * dt);
+                Vector3 step = toTarget.normalized * (_definition.moveSpeed * _speedMultiplier * dt);
                 position += step + Separation() * (separationStrength * dt);
             }
 

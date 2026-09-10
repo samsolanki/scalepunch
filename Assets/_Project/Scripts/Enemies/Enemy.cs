@@ -41,12 +41,18 @@ namespace ScalePunch.Enemies
             if (health != null) health.Died -= OnDied;
         }
 
-        public void Spawn(EnemyDefinition definition, int wave, float stageMultiplier, Transform target)
+        /// <summary>
+        /// HP and damage take separate stage multipliers so a stage can be made
+        /// spongier without also making it deadlier, which is the usual way a
+        /// difficulty curve gets tuned.
+        /// </summary>
+        public void Spawn(EnemyDefinition definition, int wave, float hpMultiplier,
+                          float damageMultiplier, Transform target)
         {
             Definition = definition;
 
-            health.Init(definition.HPAtWave(wave, stageMultiplier), definition.armor);
-            movement.Configure(definition, definition.DamageAtWave(wave, stageMultiplier), target);
+            health.Init(definition.HPAtWave(wave, hpMultiplier), definition.armor);
+            movement.Configure(definition, definition.DamageAtWave(wave, damageMultiplier), target);
 
             transform.localScale = Vector3.one * definition.scale;
 

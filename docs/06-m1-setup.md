@@ -149,17 +149,38 @@ M0 took no input, M1 takes button presses.
 | Draft decision time | 2-4 s | If they read every card carefully, they are too wordy |
 | Gem collection | Feels greedy | Gems accelerate into you; a slow float reads as a chore |
 
+## Run lifecycle (added after this guide was written)
+
+`RunSceneBuilder` now also generates `Stage_01`, eight `Wave_NN` assets, a
+`Zombie_Boss` definition and prefab, the `RunController`, the wave counter and
+boss banner on the HUD, and the run-end screen. **Re-run
+`ScalePunch ▸ Build Run Scene`** — none of it needs hand-wiring.
+
+The eight waves are shaped as a curve, not a ramp: waves 4 and 7 are
+deliberately quiet. Unbroken escalation reads as flat, and the dips are what
+make waves 5, 6 and 8 land.
+
+Tuning entry points, in the order worth touching:
+
+| Where | Number | Effect |
+|---|---|---|
+| `Stage_01` | `hpMultiplier` / `damageMultiplier` | Whole-stage difficulty, separately |
+| `Zombie_Boss` | `baseHP` (180) | Boss fight length. Spawns unscaled — the asset value is literal |
+| `BossController` on the prefab | `telegraphSeconds` (1.2) | The player's window to react. Shorter reads as unfair |
+| `Wave_NN` | `duration`, entry `spreadSeconds` | Pacing within a wave |
+| `Stage_01` | `coinsOnClear`, `failPayoutFraction` | The payout, once P2 banks it |
+
 ## What is still open in M1
 
 Delivered here: XP and levelling, the draft, eight abilities with three active
 effects, and the priority toggle. Still outstanding from `03-roadmap.md`:
 
-- **`WaveDefinition` timelines.** The spawner still ramps on a timer.
+- ~~`WaveDefinition` timelines~~ — done.
 - **Spitter.** Needs ranged-attack code; Shambler, Runner and Brute are stat
   variants and already work.
-- **The boss** and its two telegraphed phases.
-- **Victory and defeat screens** with a reward summary. Player death currently
-  does nothing.
+- ~~The boss and its two telegraphed phases~~ — done.
+- ~~Victory and defeat screens~~ — done. The payout is computed and shown but
+  not banked; `RunController.Payout()` is where P2's currency service plugs in.
 - **Evolutions.** `evolvesInto` / `evolutionRequires` exist on
   `AbilityDefinition` and the draft already skips `isEvolution` assets, but
   nothing unlocks them yet. That is M3.

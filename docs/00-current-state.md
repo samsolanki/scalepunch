@@ -34,9 +34,9 @@ three cards — the only interaction a run has.
 | XP, gems, magnet, levelling | **BUILT** |
 | Ability draft, 8 abilities, 3 active effects | **BUILT** |
 | Run HUD: XP, health, timer, kills, priority toggle | **BUILT** |
-| **Waves / stages** | **DESIGNED** — spawner is still a plain timer ramp |
-| **Boss** | **DESIGNED** |
-| **Run end (win/lose)** | **DESIGNED** — death only disables the HUD |
+| Waves / stages | **BUILT** — 8 authored waves, ~3:30 |
+| Boss | **BUILT** — two phases, telegraphed charge |
+| Run end (win/lose) | **BUILT** — end screen, payout, retry |
 | **Audio** | **DESIGNED** — *no audio system exists at all* |
 | Currencies, gear, base rooms, save | **DESIGNED** — zero code |
 | Ads / IAP / analytics | **DESIGNED** — M4 |
@@ -66,17 +66,17 @@ The project currently contradicts itself.
 - [ ] Delete `Assets/NewMonoBehaviourScript.cs` (Unity template leftover).
 - [ ] Duplicate `<summary>` tag on `SqrDistanceToSegment`.
 
-### P1 — The run lifecycle (the real gap)
+### P1 — The run lifecycle — **DONE**
 
-**A run currently has no beginning, no end and no consequence.** Everything
-downstream is meaningless until this exists.
+- [x] `WaveDefinition` / `StageDefinition` timelines replacing the timer ramp
+- [x] One boss with two phases and a telegraphed charge
+- [x] Victory and defeat screens with a reward summary
+- [x] Restart flow
+- [x] Failed runs pay out at a reduced rate (`failPayoutFraction`, default 0.35)
 
-- [ ] `WaveDefinition` / `StageDefinition` timelines to replace the timer ramp
-- [ ] One boss with two telegraphed phases
-- [ ] Victory and defeat screens with a reward summary
-- [ ] Restart / return-to-meta flow
-- [ ] Failed runs still pay out, at a reduced rate — never send a player away
-      empty-handed
+Still open from P1: **return-to-meta** has nowhere to return to until P2 builds
+a meta scene, and the payout is **computed and displayed but not banked** —
+`RunController.Payout()` is the seam a `CurrencyService` plugs into.
 
 ### P2 — Persistence and rewards
 

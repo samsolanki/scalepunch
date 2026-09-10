@@ -7,6 +7,7 @@ using ScalePunch.Abilities.Effects;
 using ScalePunch.Combat;
 using ScalePunch.Data;
 using ScalePunch.Enemies;
+using ScalePunch.Stages;
 using ScalePunch.Progression;
 using ScalePunch.Weapons;
 
@@ -25,6 +26,9 @@ namespace ScalePunch.EditorTools
             public LevelCurve curve;
             public WeaponDefinition pistol;
             public EnemyDefinition[] zombies;
+            public EnemyDefinition boss;
+            public WaveDefinition[] waves;
+            public StageDefinition stage;
             public AbilityLibrary library;
         }
 
@@ -116,6 +120,9 @@ namespace ScalePunch.EditorTools
             set.pistol.steerDegreesPerSecond = 45f;
 
             set.zombies = BuildZombies();
+            set.boss = BuildBoss();
+            set.waves = BuildWaves(set.zombies, set.boss);
+            set.stage = BuildStage(set.waves, set.boss);
             set.library = BuildAbilities();
 
             // Echo the values actually written. Unity can run a queued menu item
@@ -125,7 +132,13 @@ namespace ScalePunch.EditorTools
             Debug.Log($"[ScalePunch] Data written: shambler {set.zombies[0].baseHP} HP, " +
                       $"runner {set.zombies[1].baseHP} HP, " +
                       $"brute {set.zombies[2].baseHP} HP / armour {set.zombies[2].armor}, " +
-                      $"steer {set.pistol.steerDegreesPerSecond} deg/s");
+                      $"steer {set.pistol.steerDegreesPerSecond} deg/s, " +
+                      $"stage '{set.stage.id}' {set.stage.WaveCount} waves / " +
+                      $"{set.stage.TotalWaveSeconds():0}s + boss {set.boss.baseHP} HP");
+
+            EditorUtility.SetDirty(set.stage);
+            EditorUtility.SetDirty(set.boss);
+            foreach (WaveDefinition w in set.waves) EditorUtility.SetDirty(w);
 
             EditorUtility.SetDirty(set.tuning);
             EditorUtility.SetDirty(set.curve);
@@ -142,6 +155,13 @@ namespace ScalePunch.EditorTools
         /// </summary>
         static void Reacquire(DataSet set)
         {
+            set.boss = Keep(LoadData<EnemyDefinition>("Zombie_Boss"), set.boss);
+            set.stage = Keep(LoadData<StageDefinition>("Stage_01"), set.stage);
+
+            if (set.waves != null)
+                for (int i = 0; i < set.waves.Length; i++)
+                    set.waves[i] = Keep(LoadData<WaveDefinition>($"Wave_{i + 1:00}"), set.waves[i]);
+
             set.tuning = Keep(LoadData<CombatTuning>("CombatTuning"), set.tuning);
             set.curve = Keep(LoadData<LevelCurve>("LevelCurve"), set.curve);
             set.pistol = Keep(LoadData<WeaponDefinition>("Weapon_Pistol"), set.pistol);
@@ -210,6 +230,129 @@ namespace ScalePunch.EditorTools
                 // number of hits has to have no armour at all.
                 Zombie("Zombie_Brute",    "brute",    10f, 18f, 1.4f, 1f, 4, 1.45f, EnemyBehaviour.Brute, armor: 0f)
             };
+        }
+
+        // --------------------------------------------------------- boss & stage
+
+        static EnemyDefinition BuildBoss()
+        {
+            // Deliberately not a wall of HP. The boss is interesting because of
+            // its charge, and a fight long enough to be boring is worse than one
+            // that ends while the telegraph is still exciting. 180 HP against a
+            // levelled-up build is roughly 25-40 seconds.
+            EnemyDefinition def = Zombie("Zombie_Boss", "boss", 180f, 22f, 1.6f,
+                                        knockbackResist: 1f, xp: 40, scale: 2.2f,
+                                        behaviour: EnemyBehaviour.Brute, armor: 0f);
+
+            // Longer reach and a slower swing than a Brute: the boss should feel
+            // heavy, and its melee is not the threat — the charge is.
+            def.attackInterval = 1.4f;
+            def.attackRange = 2.0f;
+            return def;
+        }
+
+        static WaveEntry Entry(EnemyDefinition enemy, float at, int count,
+                               SpawnPattern pattern, float spread, float arc = 90f) => new()
+        {
+            enemy = enemy,
+            timeOffset = at,
+            count = count,
+            pattern = pattern,
+            spreadSeconds = spread,
+            arcDegrees = arc
+        };
+
+        static WaveDefinition Wave(int number, string display, float duration, params WaveEntry[] entries)
+        {
+            WaveDefinition wave = Asset<WaveDefinition>($"Wave_{number:00}");
+            wave.displayName = display;
+            wave.entries = entries;
+
+            // Every duration below is hand-checked against its entries' last
+            // arrival; WaveDefinition.OnValidate is the backstop for hand edits
+            // in the inspector, not for these.
+            wave.duration = duration;
+
+            EditorUtility.SetDirty(wave);
+            return wave;
+        }
+
+        /// <summary>
+        /// Eight waves, about four minutes, shaped as a curve rather than a ramp:
+        /// each wave introduces or recombines one thing, and waves 4 and 7 are
+        /// deliberately lighter. Unbroken escalation reads as flat — the dips are
+        /// what make the peaks land.
+        /// </summary>
+        static WaveDefinition[] BuildWaves(EnemyDefinition[] zombies, EnemyDefinition boss)
+        {
+            EnemyDefinition shambler = zombies[0];
+            EnemyDefinition runner = zombies[1];
+            EnemyDefinition brute = zombies[2];
+
+            return new[]
+            {
+                // 1 - teach the ring. A trickle from all sides, nothing dangerous.
+                Wave(1, "Trickle", 22f,
+                     Entry(shambler, 1f, 6, SpawnPattern.Ring, 8f)),
+
+                // 2 - first pressure direction: they come from one side.
+                Wave(2, "Pressure", 24f,
+                     Entry(shambler, 0f, 8, SpawnPattern.Ring, 10f),
+                     Entry(shambler, 12f, 6, SpawnPattern.Arc, 4f, 70f)),
+
+                // 3 - runners. Punishes a build that took no fire rate.
+                Wave(3, "Sprinters", 26f,
+                     Entry(shambler, 0f, 6, SpawnPattern.Ring, 8f),
+                     Entry(runner, 8f, 6, SpawnPattern.Arc, 3f, 60f),
+                     Entry(runner, 17f, 8, SpawnPattern.Ring, 5f)),
+
+                // 4 - lull. One Brute, alone, with room to see what it is.
+                Wave(4, "The Big One", 24f,
+                     Entry(brute, 2f, 1, SpawnPattern.Point, 0f),
+                     Entry(shambler, 10f, 6, SpawnPattern.Ring, 9f)),
+
+                // 5 - the combination the first four waves taught separately.
+                Wave(5, "Combined Arms", 30f,
+                     Entry(shambler, 0f, 10, SpawnPattern.Ring, 10f),
+                     Entry(runner, 9f, 8, SpawnPattern.Arc, 4f, 80f),
+                     Entry(brute, 16f, 2, SpawnPattern.Arc, 2f, 40f)),
+
+                // 6 - a breach: everything through one gap at once.
+                Wave(6, "Breach", 30f,
+                     Entry(runner, 0f, 12, SpawnPattern.Point, 5f),
+                     Entry(shambler, 6f, 12, SpawnPattern.Arc, 8f, 50f),
+                     Entry(brute, 18f, 2, SpawnPattern.Point, 1f)),
+
+                // 7 - second lull. Recover, and let the draft catch up.
+                Wave(7, "Regroup", 22f,
+                     Entry(shambler, 2f, 8, SpawnPattern.Ring, 12f)),
+
+                // 8 - the wall before the boss.
+                Wave(8, "The Wall", 34f,
+                     Entry(shambler, 0f, 14, SpawnPattern.Ring, 10f),
+                     Entry(runner, 7f, 12, SpawnPattern.Ring, 8f),
+                     Entry(brute, 14f, 4, SpawnPattern.Ring, 6f),
+                     Entry(runner, 24f, 10, SpawnPattern.Arc, 4f, 90f))
+            };
+        }
+
+        static StageDefinition BuildStage(WaveDefinition[] waves, EnemyDefinition boss)
+        {
+            StageDefinition stage = Asset<StageDefinition>("Stage_01");
+
+            stage.id = "stage_01";
+            stage.displayName = "Stage 1";
+            stage.waves = waves;
+            stage.boss = boss;
+            stage.bossIntroSeconds = 2.5f;
+            stage.hpMultiplier = 1f;
+            stage.damageMultiplier = 1f;
+            stage.coinsOnClear = 250;
+            stage.coinsPerKill = 2;
+            stage.failPayoutFraction = 0.35f;
+
+            EditorUtility.SetDirty(stage);
+            return stage;
         }
 
         // ----------------------------------------------------------- abilities
