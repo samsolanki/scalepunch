@@ -142,6 +142,43 @@ that a green ring and a crowd of bright zombies sit clearly on top of it.
 
 ---
 
+## 7. Gameplay scene — the style target
+
+The single most useful image to generate. Not a screenshot — a target for what
+the game should look like once the art lands, and the thing to hold every asset
+against.
+
+```
+portrait 9:16 mobile game screenshot, top-down three-quarter view angled about 55
+degrees, flat shaded low-poly 3D, stylized Synty POLYGON art style, chunky
+exaggerated character proportions, no textures, solid saturated colour blocks.
+
+Centre: a lone survivor in a steel-blue tactical vest and tan trousers standing
+completely still in a braced stance, firing a pistol, a bright muzzle flash at
+the barrel. A wide glowing neon-green circle is drawn flat on the ground around
+them, about five times their height across, thin and bright.
+
+Surrounding them: a crowd of about thirty stylized zombies converging inward from
+every direction — slouched desaturated-green shamblers, small acid-yellow runners
+crouched forward mid-sprint, and two wide hunched red-brown brutes. Some are
+outside the green circle, some are crossing it.
+
+Bright yellow bullet tracer streaks fly from the survivor outward. Small floating
+damage numbers in white and orange.
+
+Ground: very dark near-black blue-grey asphalt, low contrast, a few silhouetted
+overturned chairs and crates barely visible. Dark background, no sky, moody cool
+ambient light. The characters and the green circle are the only bright things in
+frame.
+```
+
+**Watch for:** the generator will want to light the ground and add scenery. Both
+break the read. If the zombies do not pop clearly against the floor, push the
+ground darker rather than the characters brighter — the palette has to survive a
+crowd of 150, not 30.
+
+---
+
 ## Caveats
 
 **Text-to-image will not give you a clean orthographic turnaround.** Multi-view
