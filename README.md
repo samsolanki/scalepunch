@@ -38,6 +38,7 @@ Engine: Unity 6 LTS, URP, 3D.
 | [`docs/06-m1-setup.md`](docs/06-m1-setup.md) | XP, the level-up draft, the ability roster to author, and the HUD |
 | [`docs/07-save-and-currency.md`](docs/07-save-and-currency.md) | The profile format, the migration rule, currencies, and the editor save tools |
 | [`docs/08-draft-screen.md`](docs/08-draft-screen.md) | What triggers a draft, everything a card shows, and the rarity table |
+| [`docs/09-art-direction.md`](docs/09-art-direction.md) | The art style, why, what to buy, and the readability check to run first |
 
 ## Start here
 
