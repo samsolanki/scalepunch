@@ -123,6 +123,25 @@ the phase-two enrage something to brighten.
 
 ---
 
+## 6. Environment — arena
+
+```
+top-down 3/4 view of a small empty urban plaza at night, flat shaded low-poly 3D
+stylized mobile game environment, Synty POLYGON art style, dark desaturated
+asphalt ground in near-black blue-grey, a few scattered silhouetted props —
+overturned chairs, a bench, a crate, a bollard — all very dark and low contrast,
+no bright surfaces, no signage, no lighting fixtures, empty clear centre with
+nothing in it, clean hard-edged faceted geometry, no textures, moody cool ambient
+light, environment concept, no characters
+```
+
+**Watch for:** the generator will want to light it dramatically and fill the
+centre. Both are wrong. The centre must stay **empty** — that is where the
+player and the engagement ring live — and the whole ground must stay dark enough
+that a green ring and a crowd of bright zombies sit clearly on top of it.
+
+---
+
 ## Caveats
 
 **Text-to-image will not give you a clean orthographic turnaround.** Multi-view
