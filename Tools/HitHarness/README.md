@@ -32,10 +32,32 @@ A pass here means aiming and detection are correct in isolation. If rounds still
 fail in the editor, the fault is in that second list, and the near-miss logging
 in `WeaponTelemetry` is what narrows it down.
 
+## Pass criterion
+
+**Every round must connect**, at every range including point blank — not merely
+"no round was logged as a miss".
+
+The first version failed only on `missed > 0`, and it reported PASS against a
+92% hit rate. A round that spawns past its target and spends its whole life
+turning around is never logged as a miss; it is still in the air when the
+engagement ends. A test that cannot fail is worse than no test, because it is
+believed.
+
 ## Regression value
 
-Run against the pre-fix flat-radius detection, this harness **still passes** —
+Verified in both directions against the barrel-tip spawn bug:
+
+```
+pre-fix   92.3%   FAIL - 361 rounds never landed
+post-fix  100.0%  PASS
+```
+
+Point-blank cases are what catch it. Engagements that start at 16 m and walk in
+never sample the range where a round can spawn *past* its target, so the
+original harness passed happily while the bug was live.
+
+Run against the pre-fix flat-radius detection, the harness **still passes** —
 because the lock-on drives every round to the target's centre, where a 0.55 m
-test is plenty even for a Brute. That is worth knowing: the per-tier body radius
-is a genuine correctness fix and it matters for any weapon that does *not* home
-(a shotgun), but it was **not** the cause of rounds failing to connect in play.
+test is plenty even for a Brute. Worth knowing: the per-tier body radius is a
+genuine correctness fix and it matters for any weapon that does *not* home (a
+shotgun), but it was **not** the cause of rounds failing to connect in play.

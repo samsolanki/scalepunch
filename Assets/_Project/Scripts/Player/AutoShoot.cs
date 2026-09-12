@@ -70,6 +70,7 @@ namespace ScalePunch.Player
         [SerializeField] bool drawGizmos = true;
 
         float _cooldown;
+        float _muzzleOffset;
         Health _health;
 
         /// <summary>Settable at runtime — the HUD toggle drives this.</summary>
@@ -107,6 +108,12 @@ namespace ScalePunch.Player
             if (turret == null) turret = transform;
             if (muzzle == null) muzzle = turret;
             _health = GetComponent<Health>();
+
+            // Ground-plane distance from the pivot to the barrel tip. Constant,
+            // and needed every shot to keep the spawn from overshooting a target
+            // that is closer than the barrel is long.
+            Vector3 local = muzzle.localPosition;
+            _muzzleOffset = new Vector2(local.x, local.z).magnitude;
         }
 
         void Update()
@@ -286,15 +293,26 @@ namespace ScalePunch.Player
             int pierce = Mathf.RoundToInt(sheet.Get(StatType.Pierce));
             int rounds = RoundsThisShot(sheet);
 
-            // Spawns at the barrel tip, but flies along the pivot-to-intercept
-            // line the turret was aimed down — the same line, once the slew has
-            // settled, and free of the close-range flip that using the muzzle as
-            // the origin introduces.
-            Vector3 origin = muzzle.position;
+            Vector3 pivot = turret.position;
 
-            Vector3 aim = aimPoint - turret.position;
-            aim.y = 0f;
-            aim = aim.sqrMagnitude < 0.0001f ? turret.forward : aim.normalized;
+            Vector3 toAim = aimPoint - pivot;
+            toAim.y = 0f;
+            float aimDistance = toAim.magnitude;
+            Vector3 aim = aimDistance < 0.0001f ? turret.forward : toAim / aimDistance;
+
+            // The barrel is 1.16 m long. Spawning at its tip puts the round PAST
+            // anything closer than that — a zombie at 0.1 m ends up 1.06 m behind
+            // the round, which then flies away from it, spends its whole range
+            // turning around, and expires. Measured at 13% hits inside 1 m against
+            // 76% further out.
+            //
+            // So the spawn slides down the barrel as the target closes, and never
+            // passes the halfway point to it. At normal range this is the barrel
+            // tip exactly; at knife range the round leaves from the chest.
+            float spawnAlong = Mathf.Min(_muzzleOffset, aimDistance * 0.5f);
+
+            Vector3 origin = pivot + aim * spawnAlong;
+            origin.y = muzzle.position.y;
 
             for (int i = 0; i < rounds; i++)
             {

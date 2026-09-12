@@ -50,14 +50,14 @@ static class Harness
     }
 
     static void Engage(float zombieSpeed, float bodyRadius, float approachDeg, int seed,
-                       ref int fired, ref int hit, ref int missed)
+                       ref int fired, ref int hit, ref int missed, float startDistance = 16f)
     {
         var rnd = new Random(seed);
         EnemyRegistry.Clear();
 
         var z = new Enemy { BodyRadius = bodyRadius };
         float ang = approachDeg * Mathf.Deg2Rad;
-        z.transform.position = new Vector3(Mathf.Cos(ang) * 16f, 0f, Mathf.Sin(ang) * 16f);
+        z.transform.position = new Vector3(Mathf.Cos(ang) * startDistance, 0f, Mathf.Sin(ang) * startDistance);
         EnemyRegistry.Register(z);
 
         Vector3 turretDir = new Vector3(0, 0, 1);
@@ -93,9 +93,14 @@ static class Harness
                     if (cooldown <= 0f && AngleBetween(turretDir, aim) <= allowed)
                     {
                         float err = (float)(rnd.NextDouble() * 2 - 1) * INACCURACY;
+
+                        // AutoShoot.Fire: the spawn slides down the barrel as the
+                        // target closes, so the round never starts past it.
+                        float spawnAlong = Mathf.Min(MUZZLE_FWD, dist * 0.5f);
+
                         rounds.Add(new Round
                         {
-                            pos = turretDir * MUZZLE_FWD,
+                            pos = turretDir * spawnAlong,
                             dir = Rot(aim.normalized, err).normalized
                         });
                         fired++;
@@ -151,17 +156,31 @@ static class Harness
             for (int i = 0; i < 90; i++)
                 Engage(t.Speed, body, i * 4f, i, ref fired, ref hit, ref missed);
 
+            // Point blank. The barrel is 1.16 m long, so a target inside that is
+            // the case where a round can spawn PAST what it was fired at — which
+            // the far-approach cases never reach and so never caught.
+            for (int i = 0; i < 60; i++)
+                Engage(t.Speed, body, i * 6f, 1000 + i, ref fired, ref hit, ref missed,
+                       startDistance: 0.3f + (i % 5) * 0.25f);
+
             float rate = fired == 0 ? 0 : 100f * hit / fired;
             Console.WriteLine($"  {t.Name,-9} {body,5:0.00} {fired,8} {hit,6} {missed,7}  {rate,5:0.0}%");
-            if (missed > 0) failures++;
+
+            // Every round must connect, not merely "not be logged as a miss".
+            // The first version failed only on `missed > 0`, and a round that
+            // spawned past its target and spent its life turning around is not
+            // counted as a miss — it is still in the air when the engagement
+            // ends. That let a 92% hit rate report PASS.
+            if (hit < fired) failures++;
             tf += fired; th += hit; tm += missed;
         }
 
         Console.WriteLine($"  {"TOTAL",-9} {"",5} {tf,8} {th,6} {tm,7}  {(100f * th / tf),5:0.0}%");
         Console.WriteLine();
+        float total = tf == 0 ? 0f : 100f * th / tf;
         Console.WriteLine(failures == 0
-            ? "PASS - no round expired with a live target. Detection covers every tier."
-            : $"FAIL - {failures} tier(s) dropped rounds.");
+            ? "PASS - every round connected, at every range including point blank."
+            : $"FAIL - {failures} tier(s) below 100%. Overall {total:0.0}%, {tf - th} rounds never landed.");
         return failures == 0 ? 0 : 1;
     }
 }
