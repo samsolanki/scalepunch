@@ -1,4 +1,5 @@
 using UnityEngine;
+using ScalePunch.Combat;
 
 namespace ScalePunch.Core
 {
@@ -14,6 +15,15 @@ namespace ScalePunch.Core
     {
         [SerializeField] PrototypeConfig config;
 
-        void Awake() => PrototypeConfig.SetActive(config);
+        void Awake()
+        {
+            PrototypeConfig.SetActive(config);
+
+            // Reset here, not in the telemetry itself: statics survive a scene
+            // reload, so a restarted run would otherwise report the previous run's
+            // accuracy plus its own.
+            WeaponTelemetry.Reset();
+            WeaponTelemetry.Verbose = PrototypeConfig.Active.verboseWeaponLog;
+        }
     }
 }

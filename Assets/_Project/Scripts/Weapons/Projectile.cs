@@ -26,6 +26,7 @@ namespace ScalePunch.Weapons
         float _lifestealFraction;
         bool _reserved;
         bool _connected;
+        int _shotId;
         bool _guaranteed;
         float _retargetRadius;
         Health _shooter;
@@ -71,7 +72,7 @@ namespace ScalePunch.Weapons
             _guaranteed = guaranteedHit;
             _retargetRadius = retargetRadius;
             _connected = false;
-            WeaponTelemetry.ReportFired();
+            _shotId = WeaponTelemetry.ReportFired(target, origin);
 
             _alreadyHit.Clear();
             if (trail != null) trail.Clear();
@@ -179,7 +180,13 @@ namespace ScalePunch.Weapons
 
                 _alreadyHit.Add(hit);
                 _connected = true;
+
+                // Captured either side of the call so the log shows what the round
+                // actually removed, after armour — not the number it set out with.
+                float before = hit.Health.Current;
                 hit.Health.TakeDamage(new DamageInfo(_damage, _isCrit, from, gameObject));
+                WeaponTelemetry.ReportHit(_shotId, hit, before - hit.Health.Current,
+                                          before, hit.Health.Current);
 
                 // Lifesteal resolves at the point of impact, not the point of
                 // firing — a round in flight has not healed anyone yet.
@@ -197,18 +204,12 @@ namespace ScalePunch.Weapons
 
             _live = false;
 
-            if (_connected)
+            // A connected round already reported itself at the moment of impact,
+            // which is also the only place the real damage figure exists.
+            if (!_connected)
             {
-                WeaponTelemetry.ReportHit();
-            }
-            else if (HadLiveTarget)
-            {
-                WeaponTelemetry.ReportExpired();
-                WeaponTelemetry.ReportNearMiss(transform.position, _target, _hitRadius);
-            }
-            else
-            {
-                WeaponTelemetry.ReportWasted();
+                if (HadLiveTarget) WeaponTelemetry.ReportExpired(_shotId, transform.position, _target, _hitRadius);
+                else WeaponTelemetry.ReportWasted(_shotId);
             }
 
             ReleaseReservation();

@@ -45,6 +45,12 @@ namespace ScalePunch.Core
                  "so changing it needs a rebuild — not a runtime toggle.")]
         public bool fullAbilityRoster;
 
+        [Header("Debug")]
+        [Tooltip("One console line per round fired and per impact. Invaluable while " +
+                 "the weapon is under suspicion, noisy once it is not — at 3 shots a " +
+                 "second it fills the console fast.")]
+        public bool verboseWeaponLog = true;
+
         [Header("Presentation")]
         [Tooltip("Off: no floating health bars over zombies.")]
         public bool healthBars;
