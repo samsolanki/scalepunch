@@ -101,9 +101,38 @@ round merely *spawning* at the barrel tip; the firing arc is the target's angula
 size plus half of what the round can steer out; and it holds fire when the
 intercept falls outside the ring.
 
-`WeaponTelemetry` logs hits against rounds fired every 50 shots. Under ~85%
-against walkers means aiming is wrong, not unlucky — this bug survived two fixes
-that each sounded right, and a number would have settled it immediately.
+### Guaranteed hit
+
+`Weapon_Pistol.guaranteedHit` is **on**: every round that leaves the barrel
+reaches its target.
+
+It is not a cheat — it is a lock-on. Pursuit converges whenever the chaser is
+faster than the target, and the round is 45 m/s against 4.5, a 10:1 advantage.
+The only other requirement is turning fast enough to hold the line of sight:
+
+| Closing to | Line of sight swings at | Lock-on turns at |
+|---|---|---|
+| 9 m | 29°/s | 720°/s |
+| 2 m | 129°/s | 720°/s |
+| 0.55 m (hit radius) | 469°/s | 720°/s |
+
+The round reaches the hit radius long before the line outruns it. Two other
+things had to give for the guarantee to hold: a guaranteed round **ignores range
+expiry while its target is alive** (the range gate decides what the gun engages,
+and the target was inside it when the trigger went), and a round whose target
+dies mid-flight **retargets** to the nearest zombie within 4 m rather than
+sailing into empty floor.
+
+**What it costs.** `ProjectileSpeed` no longer affects whether you hit — it is
+now purely how fast the tracer looks. And a spread weapon's pellets would all
+converge on one zombie instead of covering an arc, so a future shotgun should
+turn this off. That is why the flag lives on the weapon and not on the player.
+
+`WeaponTelemetry` logs every 50 rounds and separates the two cases that used to
+look identical: **missed** (expired with a live target still out there — a real
+aiming failure) and **wasted** (the target died first — not a miss). With
+guaranteed hit on, missed should read 0. Anything above that is a bug, not
+variance.
 
 Rounds **reserve their damage** against the target while in flight. That
 reservation is a **preference, not an exclusion**:

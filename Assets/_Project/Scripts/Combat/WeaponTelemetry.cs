@@ -16,9 +16,21 @@ namespace ScalePunch.Combat
     {
         public static int Fired { get; private set; }
         public static int Hit { get; private set; }
+        /// <summary>Rounds that expired with a live target still out there — a
+        /// genuine aiming failure.</summary>
         public static int Expired { get; private set; }
+        /// <summary>Rounds whose target died before they landed. Wasted, but not
+        /// a miss: counting these as misses hides real regressions in noise.</summary>
+        public static int Wasted { get; private set; }
 
-        public static float Accuracy => Fired == 0 ? 0f : Hit / (float)Fired;
+        public static float Accuracy
+        {
+            get
+            {
+                int meaningful = Fired - Wasted;
+                return meaningful <= 0 ? 1f : Hit / (float)meaningful;
+            }
+        }
 
         [Tooltip("Rounds between accuracy reports.")]
         const int ReportEvery = 50;
@@ -28,6 +40,7 @@ namespace ScalePunch.Combat
             Fired = 0;
             Hit = 0;
             Expired = 0;
+            Wasted = 0;
         }
 
         public static void ReportFired()
@@ -52,9 +65,17 @@ namespace ScalePunch.Combat
 #endif
         }
 
+        public static void ReportWasted()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Wasted++;
+#endif
+        }
+
         static void Log()
-            => Debug.Log($"[Weapon] {Hit}/{Fired} rounds connected ({Accuracy * 100f:0}%), " +
-                         $"{Expired} expired short. Anything under ~85% against walkers " +
-                         "means aiming is wrong, not unlucky.");
+            => Debug.Log($"[Weapon] {Hit}/{Fired - Wasted} rounds connected ({Accuracy * 100f:0}%). " +
+                         $"{Expired} missed, {Wasted} spent on a zombie that died first.\n" +
+                         "With guaranteedHit on, 'missed' should be 0. Anything above that " +
+                         "is a real bug, not variance.");
     }
 }

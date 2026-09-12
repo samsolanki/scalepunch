@@ -116,7 +116,19 @@ namespace ScalePunch.EditorTools
             set.pistol.projectileSpeedMultiplier = 1f;
             set.pistol.extraProjectiles = 0;
             set.pistol.spreadDegrees = 0f;
+
+            // Kept at 1 degree even under guaranteed hit: the lock-on corrects it
+            // inside a single frame, and it stops every tracer leaving on the
+            // exact same line, which reads as a laser rather than gunfire.
             set.pistol.inaccuracyDegrees = 1.0f;
+
+            // Every round reaches its target. Pursuit converges whenever the round
+            // is faster than the target — 45 m/s against 4.5 — but only if it can
+            // turn fast enough to hold the line of sight. A Runner crossing at the
+            // 0.55 m hit radius swings that line at roughly 470 deg/s, so 720 is
+            // the rate with margin rather than a round number.
+            set.pistol.guaranteedHit = true;
+            set.pistol.lockOnDegreesPerSecond = 720f;
 
             // Barely any steering. 220 deg/s let rounds visibly curve after a
             // target, which reads as a guided missile, not a bullet.
@@ -150,6 +162,7 @@ namespace ScalePunch.EditorTools
                       $"runner {set.zombies[1].baseHP} HP, " +
                       $"brute {set.zombies[2].baseHP} HP / armour {set.zombies[2].armor}, " +
                       $"steer {set.pistol.steerDegreesPerSecond} deg/s, " +
+                      $"guaranteedHit {set.pistol.guaranteedHit}, " +
                       $"prototype: waves {set.prototype.waves}, boss {set.prototype.boss}, " +
                       $"rarity {set.prototype.abilityRarity}, save {set.prototype.saveAndCurrency}, " +
                       $"{set.library.abilities.Count} abilities. " +

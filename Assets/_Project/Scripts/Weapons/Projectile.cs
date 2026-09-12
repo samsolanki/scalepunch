@@ -26,6 +26,8 @@ namespace ScalePunch.Weapons
         float _lifestealFraction;
         bool _reserved;
         bool _connected;
+        bool _guaranteed;
+        float _retargetRadius;
         Health _shooter;
         bool _isCrit;
         int _pierceRemaining;
@@ -39,7 +41,8 @@ namespace ScalePunch.Weapons
         public void Launch(Vector3 origin, Vector3 direction, Enemy target,
                            float damage, bool isCrit, float speed, float hitRadius,
                            int pierce, float range, float lifetime, float steerDegPerSec,
-                           Health shooter = null, float lifestealFraction = 0f)
+                           Health shooter = null, float lifestealFraction = 0f,
+                           bool guaranteedHit = false, float retargetRadius = 4f)
         {
             transform.position = origin;
 
@@ -65,6 +68,8 @@ namespace ScalePunch.Weapons
             _reserved = target != null && !target.IsDead;
             if (_reserved) target.ReserveDamage(damage);
 
+            _guaranteed = guaranteedHit;
+            _retargetRadius = retargetRadius;
             _connected = false;
             WeaponTelemetry.ReportFired();
 
@@ -82,14 +87,22 @@ namespace ScalePunch.Weapons
             _lifeRemaining -= dt;
             if (_lifeRemaining <= 0f) { Expire(); return; }
 
+            if (_guaranteed) KeepTarget();
             Steer(dt);
 
             Vector3 from = transform.position;
             float step = _speed * dt;
 
-            // Rounds die at the edge of the engagement radius, not somewhere
-            // vague off screen, so the range stat means exactly what it shows.
-            if (step >= _rangeRemaining) { Expire(); return; }
+            // Rounds die at the edge of the engagement radius, so the range stat
+            // means exactly what it shows.
+            //
+            // Except while a guaranteed round still has something to hit: the
+            // range gate is about how far the gun reaches, and the target was
+            // inside that when the trigger went. Expiring mid-flight because the
+            // zombie walked a step would break the guarantee over a technicality.
+            bool rangeBound = !_guaranteed || _target == null || _target.IsDead;
+
+            if (rangeBound && step >= _rangeRemaining) { Expire(); return; }
             _rangeRemaining -= step;
 
             Vector3 to = from + _direction * step;
@@ -111,6 +124,28 @@ namespace ScalePunch.Weapons
         /// at a time. Re-solving keeps the round on an interception course as the
         /// target manoeuvres, which is the only thing homing should be doing.
         /// </summary>
+        /// <summary>
+        /// Hands a round whose target died to the nearest zombie instead of
+        /// letting it sail into empty floor. A round with nothing to hit is not a
+        /// miss, but it is still a wasted round.
+        /// </summary>
+        void KeepTarget()
+        {
+            if (_target != null && !_target.IsDead) return;
+            if (_retargetRadius <= 0f) return;
+
+            Enemy replacement = EnemyRegistry.FindNearestExcluding(
+                transform.position, _retargetRadius, _alreadyHit);
+
+            if (replacement == null) return;
+
+            ReleaseReservation();
+            _target = replacement;
+
+            _reserved = true;
+            replacement.ReserveDamage(_damage);
+        }
+
         void Steer(float dt)
         {
             if (_steerDegPerSec <= 0f) return;
@@ -128,6 +163,10 @@ namespace ScalePunch.Weapons
                 _direction, toAim.normalized,
                 _steerDegPerSec * Mathf.Deg2Rad * dt, 0f).normalized;
         }
+
+        /// <summary>Reports whether the round ever touched anything, so a round
+        /// spent on an already-dying zombie is not counted as an aiming failure.</summary>
+        bool HadLiveTarget => _target != null && !_target.IsDead;
 
         void Sweep(Vector3 from, Vector3 to)
         {
@@ -159,7 +198,8 @@ namespace ScalePunch.Weapons
             _live = false;
 
             if (_connected) WeaponTelemetry.ReportHit();
-            else WeaponTelemetry.ReportExpired();
+            else if (HadLiveTarget) WeaponTelemetry.ReportExpired();
+            else WeaponTelemetry.ReportWasted();
 
             ReleaseReservation();
             Expired?.Invoke(this);

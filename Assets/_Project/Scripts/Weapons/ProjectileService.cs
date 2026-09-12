@@ -50,9 +50,16 @@ namespace ScalePunch.Weapons
                 round.Expired += Reclaim;
             }
 
+            // A guaranteed round uses the lock-on turn rate: pursuit only converges
+            // if the round can turn fast enough to hold the line of sight, and the
+            // cosmetic homing rate cannot.
+            float steer = weapon.guaranteedHit
+                ? weapon.lockOnDegreesPerSecond
+                : weapon.steerDegreesPerSecond;
+
             round.Launch(origin, direction, target, damage, isCrit, speed,
                          weapon.hitRadius, pierce, range, weapon.lifetime,
-                         weapon.steerDegreesPerSecond, shooter, lifestealFraction);
+                         steer, shooter, lifestealFraction, weapon.guaranteedHit);
         }
 
         Pool<Projectile> PoolFor(Projectile prefab)
