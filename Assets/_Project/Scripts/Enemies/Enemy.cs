@@ -28,6 +28,18 @@ namespace ScalePunch.Enemies
         public float BodyRadius { get; private set; } = 0.5f;
 
         /// <summary>
+        /// Bumped on every spawn, so anything holding a reference can tell whether
+        /// it still points at the zombie it locked onto.
+        ///
+        /// Without it, a pooled Enemy is a dangling reference that lies: the
+        /// zombie dies, the pool hands the same object straight back out for a
+        /// fresh spawn 16 m away, Spawn() clears IsDead — and a round still in
+        /// flight sees a live target and chases a completely different zombie.
+        /// `!IsDead` cannot detect that; a generation can.
+        /// </summary>
+        public int Generation { get; private set; }
+
+        /// <summary>
         /// Damage already in the air toward this zombie.
         ///
         /// Without it the turret empties four rounds into a one-bullet Shambler
@@ -83,6 +95,7 @@ namespace ScalePunch.Enemies
             // Pooled: a stale reservation from a previous life would make a fresh
             // zombie look doomed and never be shot at.
             IncomingDamage = 0f;
+            Generation++;
 
             health.Init(definition.HPAtWave(wave, hpMultiplier), definition.armor);
             movement.Configure(definition, definition.DamageAtWave(wave, damageMultiplier), target);

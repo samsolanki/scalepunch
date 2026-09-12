@@ -272,6 +272,12 @@ namespace ScalePunch.Player
         {
             if (weapon == null || !ProjectileService.Exists) return;
 
+            // Belt and braces. Update() already returns on a null target, but a
+            // round launched without one can never be guaranteed to hit, so the
+            // guarantee is only worth anything if this is impossible rather than
+            // merely unlikely.
+            if (CurrentTarget == null || CurrentTarget.IsDead) return;
+
             StatSheet sheet = stats.Stats;
 
             float damage = weapon.DamageFor(sheet);

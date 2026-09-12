@@ -17,6 +17,7 @@ namespace ScalePunch.Weapons
 
         Vector3 _direction;
         Enemy _target;
+        int _targetGeneration;
         float _damage;
         float _speed;
         float _hitRadius;
@@ -52,6 +53,7 @@ namespace ScalePunch.Weapons
             transform.rotation = Quaternion.LookRotation(_direction, Vector3.up);
 
             _target = target;
+            _targetGeneration = target != null ? target.Generation : 0;
             _damage = damage;
             _isCrit = isCrit;
             _speed = speed;
@@ -101,7 +103,7 @@ namespace ScalePunch.Weapons
             // range gate is about how far the gun reaches, and the target was
             // inside that when the trigger went. Expiring mid-flight because the
             // zombie walked a step would break the guarantee over a technicality.
-            bool rangeBound = !_guaranteed || _target == null || _target.IsDead;
+            bool rangeBound = !_guaranteed || !TargetValid;
 
             if (rangeBound && step >= _rangeRemaining) { Expire(); return; }
             _rangeRemaining -= step;
@@ -132,7 +134,7 @@ namespace ScalePunch.Weapons
         /// </summary>
         void KeepTarget()
         {
-            if (_target != null && !_target.IsDead) return;
+            if (TargetValid) return;
             if (_retargetRadius <= 0f) return;
 
             Enemy replacement = EnemyRegistry.FindNearestExcluding(
@@ -141,7 +143,9 @@ namespace ScalePunch.Weapons
             if (replacement == null) return;
 
             ReleaseReservation();
+
             _target = replacement;
+            _targetGeneration = replacement.Generation;
 
             _reserved = true;
             replacement.ReserveDamage(_damage);
@@ -150,7 +154,7 @@ namespace ScalePunch.Weapons
         void Steer(float dt)
         {
             if (_steerDegPerSec <= 0f) return;
-            if (_target == null || _target.IsDead) return;
+            if (!TargetValid) return;
 
             Vector3 targetVelocity = _target.Movement != null ? _target.Movement.Velocity : Vector3.zero;
             Vector3 aimPoint = Ballistics.Intercept(transform.position, _target.transform.position,
@@ -167,7 +171,14 @@ namespace ScalePunch.Weapons
 
         /// <summary>Reports whether the round ever touched anything, so a round
         /// spent on an already-dying zombie is not counted as an aiming failure.</summary>
-        bool HadLiveTarget => _target != null && !_target.IsDead;
+        /// <summary>
+        /// The round is still locked onto the same zombie it was fired at.
+        ///
+        /// The generation check is the whole point: a pooled Enemy that died and
+        /// was re-spawned passes `!IsDead` while being an entirely different
+        /// zombie somewhere else on the field.
+        /// </summary>
+        bool TargetValid => _target != null && !_target.IsDead && _target.Generation == _targetGeneration;
 
         void Sweep(Vector3 from, Vector3 to)
         {
@@ -208,7 +219,7 @@ namespace ScalePunch.Weapons
             // which is also the only place the real damage figure exists.
             if (!_connected)
             {
-                if (HadLiveTarget) WeaponTelemetry.ReportExpired(_shotId, transform.position, _target, _hitRadius);
+                if (TargetValid) WeaponTelemetry.ReportExpired(_shotId, transform.position, _target, _hitRadius);
                 else WeaponTelemetry.ReportWasted(_shotId);
             }
 
@@ -226,7 +237,11 @@ namespace ScalePunch.Weapons
             if (!_reserved) return;
 
             _reserved = false;
-            if (_target != null) _target.ReleaseDamage(_damage);
+
+            // Only give the claim back to the zombie it was made against. A
+            // recycled Enemy is a different zombie, and refunding it damage it
+            // never had reservations for corrupts its IsDoomed state.
+            if (TargetValid) _target.ReleaseDamage(_damage);
         }
 
         void OnDisable()
