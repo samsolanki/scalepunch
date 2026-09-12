@@ -1,4 +1,5 @@
 using UnityEngine;
+using ScalePunch.Enemies;
 
 namespace ScalePunch.Combat
 {
@@ -69,6 +70,30 @@ namespace ScalePunch.Combat
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Wasted++;
+#endif
+        }
+
+        /// <summary>
+        /// Logs how close a failed round actually got, and to what.
+        ///
+        /// "It missed" is not diagnosable. Whether it died 0.1 m short of a
+        /// Brute's flank or 8 m from anything points at completely different
+        /// bugs, and the number is free to collect.
+        /// </summary>
+        public static void ReportNearMiss(Vector3 where, Enemy target, float roundRadius)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (target == null) return;
+
+            Vector3 delta = target.transform.position - where;
+            delta.y = 0f;
+
+            float gap = delta.magnitude - (roundRadius + target.BodyRadius);
+
+            Debug.LogWarning($"[Weapon] Round expired {delta.magnitude:0.00} m from " +
+                             $"'{target.Definition?.id}' — {gap:0.00} m outside its hit reach " +
+                             $"(round {roundRadius:0.00} + body {target.BodyRadius:0.00}). " +
+                             $"{EnemyRegistry.Count} zombies live.");
 #endif
         }
 

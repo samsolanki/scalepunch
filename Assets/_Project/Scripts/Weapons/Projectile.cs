@@ -197,9 +197,19 @@ namespace ScalePunch.Weapons
 
             _live = false;
 
-            if (_connected) WeaponTelemetry.ReportHit();
-            else if (HadLiveTarget) WeaponTelemetry.ReportExpired();
-            else WeaponTelemetry.ReportWasted();
+            if (_connected)
+            {
+                WeaponTelemetry.ReportHit();
+            }
+            else if (HadLiveTarget)
+            {
+                WeaponTelemetry.ReportExpired();
+                WeaponTelemetry.ReportNearMiss(transform.position, _target, _hitRadius);
+            }
+            else
+            {
+                WeaponTelemetry.ReportWasted();
+            }
 
             ReleaseReservation();
             Expired?.Invoke(this);

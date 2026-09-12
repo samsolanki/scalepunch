@@ -17,6 +17,17 @@ namespace ScalePunch.Enemies
         public EnemyMovement Movement => movement;
 
         /// <summary>
+        /// Ground-plane radius of the body, scaled with the definition.
+        ///
+        /// Hit detection used one flat number from the weapon for every tier,
+        /// while the model is scaled per tier — so a Brute's body reached 0.72 m
+        /// against a 0.55 m test and a round could pass visibly *through* the
+        /// model while the code correctly reported no hit. On the Boss the gap was
+        /// half a metre.
+        /// </summary>
+        public float BodyRadius { get; private set; } = 0.5f;
+
+        /// <summary>
         /// Damage already in the air toward this zombie.
         ///
         /// Without it the turret empties four rounds into a one-bullet Shambler
@@ -77,6 +88,9 @@ namespace ScalePunch.Enemies
             movement.Configure(definition, definition.DamageAtWave(wave, damageMultiplier), target);
 
             transform.localScale = Vector3.one * definition.scale;
+
+            // Unity's capsule primitive is 0.5 radius at scale 1.
+            BodyRadius = 0.5f * Mathf.Max(0.01f, definition.scale);
 
             EnemyRegistry.Register(this);
         }

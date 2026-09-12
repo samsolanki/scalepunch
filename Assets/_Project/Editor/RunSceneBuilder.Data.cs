@@ -104,11 +104,10 @@ namespace ScalePunch.EditorTools
             // extraProjectiles and spread raised - no code change.
             set.pistol.id = "pistol";
             set.pistol.displayName = "Pistol";
-            // The zombie capsule is 0.5 radius and the round about 0.05, so 0.55
-            // is the radius at which a visual contact and a registered hit agree.
-            // Erring generous here is invisible; erring tight reads as bullets
-            // passing through zombies.
-            set.pistol.hitRadius = 0.55f;
+            // The round's own radius only. The target's body radius is added at
+            // detection time and scales per tier, so this no longer has to be a
+            // compromise that fits a Shambler and misses a Brute.
+            set.pistol.hitRadius = 0.12f;
             set.pistol.lifetime = 2.5f;
             set.pistol.damageMultiplier = 1f;
             set.pistol.fireRateMultiplier = 1f;
