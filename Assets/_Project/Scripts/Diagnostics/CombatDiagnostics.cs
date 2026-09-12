@@ -6,13 +6,24 @@ using ScalePunch.Weapons;
 namespace ScalePunch.Diagnostics
 {
     /// <summary>
-    /// TEMPORARY. Prints one line a second describing whether the combat loop is
-    /// actually working: are zombies spawning, is one being targeted, are rounds
-    /// leaving the barrel, and are they connecting.
+    /// Prints one line a second describing whether the combat loop is actually
+    /// working: are zombies spawning, is one being targeted, are rounds leaving
+    /// the barrel, and are they connecting.
     ///
-    /// It installs itself when play starts, so it needs no scene change and no
-    /// rebuild. Delete this file and the two counters in Projectile when the
-    /// question is answered.
+    /// Off by default and editor-only. Toggle with ScalePunch > Combat
+    /// Diagnostics, then press Play - it installs itself, so no scene change or
+    /// rebuild is needed. It found the 12-degree firing arc that was sending
+    /// half of all rounds wide, which was invisible from the Game view.
+    ///
+    /// Read the numbers as:
+    ///   target=NONE while nearest &lt;= range  -> acquisition is broken
+    ///   target=NONE while nearest &gt;  range  -> nothing in range yet, fine
+    ///   shots/s &gt; 0 with hits/s stuck at 0  -> rounds fire but never connect
+    ///   a rising missed count next to hits   -> some rounds expire at the ring
+    ///
+    /// One caveat when reading it: the sample is taken once a second, so a line
+    /// can legitimately show shots and kills alongside target=NONE - the target
+    /// was acquired, shot and killed between two samples.
     /// </summary>
     public class CombatDiagnostics : MonoBehaviour
     {
@@ -25,11 +36,20 @@ namespace ScalePunch.Diagnostics
         int _lastHits;
         int _lastShots;
 
+        public const string EnabledPref = "ScalePunch.CombatDiagnostics";
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
         {
+            // Editor-only and opt-in: a per-second Debug.Log has no business in a
+            // build, and a console full of telemetry hides the one error that
+            // matters.
+#if UNITY_EDITOR
+            if (!UnityEditor.EditorPrefs.GetBool(EnabledPref, false)) return;
+
             var go = new GameObject("~CombatDiagnostics");
             go.AddComponent<CombatDiagnostics>();
+#endif
         }
 
         void Start()
