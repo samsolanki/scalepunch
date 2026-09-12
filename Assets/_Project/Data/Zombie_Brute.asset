@@ -14,12 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Enemies.EnemyDefinition
   id: brute
   prefab: {fileID: 630060368282572915, guid: 5d711c013d282ae43b260066b782e65d, type: 3}
-  baseHP: 90
+  baseHP: 10
   baseDamage: 18
   moveSpeed: 1.4
   attackRange: 1.4
   attackInterval: 1
-  armor: 2
+  armor: 0
   behaviour: 2
   knockbackResistance: 1
   xpValue: 4

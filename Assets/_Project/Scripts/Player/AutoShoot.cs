@@ -44,11 +44,19 @@ namespace ScalePunch.Player
         [SerializeField] TargetPriority priority = TargetPriority.Closest;
         [Tooltip("Degrees per second the turret slews. The gun does not fire until it is on target.")]
         [SerializeField] float turnSpeed = 720f;
-        [Tooltip("How far off-aim the turret may be and still fire, in degrees.")]
-        [Range(1f, 90f)] [SerializeField] float firingArc = 12f;
+        [Tooltip("How far off-aim the turret may be and still fire, in degrees. " +
+                 "Keep this small: at 7 m even 12 degrees is about 1.5 m of lateral " +
+                 "error, roughly three times the round's hit radius, so a wide arc " +
+                 "means firing shots that cannot connect.")]
+        [Range(0.5f, 90f)] [SerializeField] float firingArc = 3.5f;
         [Tooltip("Re-picking a target every frame makes the turret twitch between " +
                  "equidistant zombies. It holds its target until the target dies or leaves this radius.")]
         [SerializeField] float targetStickiness = 1.15f;
+
+        [Tooltip("Aim where the target will be when the round arrives, rather than " +
+                 "where it is now. This is how a turret hits a mover without the " +
+                 "rounds visibly curving after it.")]
+        [SerializeField] bool leadTarget = true;
 
         [Header("Debug")]
         [SerializeField] bool drawGizmos = true;
@@ -159,11 +167,34 @@ namespace ScalePunch.Player
             return best;
         }
 
+        /// <summary>
+        /// Where to aim: the target's position plus however far it will travel
+        /// while the round is in the air. Solved twice, because the flight time
+        /// depends on the lead point which depends on the flight time.
+        /// </summary>
+        Vector3 AimPoint()
+        {
+            Vector3 position = CurrentTarget.transform.position;
+            if (!leadTarget) return position;
+
+            float speed = weapon != null ? weapon.SpeedFor(stats.Stats) : stats.Get(StatType.ProjectileSpeed);
+            if (speed <= 0.01f) return position;
+
+            Vector3 velocity = CurrentTarget.Movement != null ? CurrentTarget.Movement.Velocity : Vector3.zero;
+            if (velocity.sqrMagnitude < 0.0001f) return position;
+
+            Vector3 aim = position;
+            for (int i = 0; i < 2; i++)
+                aim = position + velocity * (Vector3.Distance(muzzle.position, aim) / speed);
+
+            return aim;
+        }
+
         /// <summary>Turns the turret toward the target. Returns true once the
         /// aim error is inside the firing arc.</summary>
         bool SlewToTarget()
         {
-            Vector3 toTarget = CurrentTarget.transform.position - turret.position;
+            Vector3 toTarget = AimPoint() - turret.position;
             toTarget.y = 0f;
             if (toTarget.sqrMagnitude < 0.0001f) return false;
 

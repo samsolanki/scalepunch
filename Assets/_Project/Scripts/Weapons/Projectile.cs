@@ -31,6 +31,12 @@ namespace ScalePunch.Weapons
 
         readonly List<Enemy> _alreadyHit = new(4);
 
+        /// <summary>Diagnostic only: total rounds that have connected this run.
+        /// Read by CombatDiagnostics; remove with it.</summary>
+        public static int TotalHits;
+        /// <summary>Diagnostic only: rounds that expired without hitting anything.</summary>
+        public static int TotalMisses;
+
         /// <summary>Raised when the round is spent, so the pool can reclaim it.</summary>
         public System.Action<Projectile> Expired;
 
@@ -114,6 +120,7 @@ namespace ScalePunch.Weapons
                 if (hit == null) return;
 
                 _alreadyHit.Add(hit);
+                TotalHits++;
                 hit.Health.TakeDamage(new DamageInfo(_damage, _isCrit, from, gameObject));
 
                 // Lifesteal resolves at the point of impact, not the point of
@@ -129,6 +136,7 @@ namespace ScalePunch.Weapons
         void Expire()
         {
             if (!_live) return;
+            if (_alreadyHit.Count == 0) TotalMisses++;
             _live = false;
             Expired?.Invoke(this);
         }

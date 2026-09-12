@@ -20,6 +20,10 @@ namespace ScalePunch.Enemies
         [Header("Knockback")]
         [SerializeField] float knockbackDecay = 9f;
 
+        /// <summary>World-space velocity over the last frame. Read by AutoShoot to
+        /// aim where this zombie will be rather than where it is.</summary>
+        public Vector3 Velocity { get; private set; }
+
         EnemyDefinition _definition;
         Transform _target;
         Health _targetHealth;
@@ -36,6 +40,7 @@ namespace ScalePunch.Enemies
             _targetHealth = target != null ? target.GetComponent<Health>() : null;
             _attackTimer = 0f;
             _knockbackVelocity = Vector3.zero;
+            Velocity = Vector3.zero;
         }
 
         public void ApplyKnockback(Vector3 direction, float force)
@@ -73,6 +78,7 @@ namespace ScalePunch.Enemies
                 position += step + Separation() * (separationStrength * dt);
             }
 
+            Velocity = dt > 0f ? (position - transform.position) / dt : Vector3.zero;
             transform.position = position;
 
             if (distance > 0.01f)

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Enemies.EnemyDefinition
   id: shambler
   prefab: {fileID: 630060368282572915, guid: 5d711c013d282ae43b260066b782e65d, type: 3}
-  baseHP: 20
+  baseHP: 5
   baseDamage: 8
   moveSpeed: 2.5
   attackRange: 1.4
