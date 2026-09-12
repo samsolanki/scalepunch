@@ -70,7 +70,8 @@ toggle on the list above changes the answer.
 | Ability draft, 8 abilities, 3 active effects | **BUILT** |
 | Draft rarity (5 tiers) + before/after card values | **BUILT** |
 | Kill-triggered drafts (5, 15, 30, …) | **BUILT** |
-| Run HUD: XP, health, timer, kills, priority toggle | **BUILT** |
+| Run HUD: health bar with damage-delay + colour states, level bar with fraction, kill badge, timer, priority toggle | **BUILT** |
+| Booster slots showing active abilities + cooldown sweep | **BUILT** |
 | Waves / stages | **BUILT** — 8 authored waves, ~3:30 |
 | Boss | **BUILT** — two phases, telegraphed charge |
 | Run end (win/lose) | **BUILT** — end screen, payout, retry |

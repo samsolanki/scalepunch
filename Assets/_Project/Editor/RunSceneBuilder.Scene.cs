@@ -50,7 +50,7 @@ namespace ScalePunch.EditorTools
             RunController run = BuildSystems(data, prefabs, player.transform, stats, levels,
                                              health, camera, damageNumberRoot, healthBarRoot);
 
-            BuildHUD(canvas, levels, health, weapon, run);
+            BuildHUD(canvas, levels, health, weapon, run, abilities);
             BuildRunEndUI(canvas, run);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -315,160 +315,273 @@ namespace ScalePunch.EditorTools
         }
 
         static void BuildHUD(Canvas canvas, LevelSystem levels, Health health, AutoShoot weapon,
-                             RunController run)
+                             RunController run, AbilitySystem abilities)
         {
             var hudGo = new GameObject("HUD", typeof(RectTransform));
             hudGo.transform.SetParent(canvas.transform, false);
             Stretch((RectTransform)hudGo.transform);
             Transform hud = hudGo.transform;
 
-            // XP bar: top edge, full width. It is the only promise the run makes,
-            // and a thumb must never cover it.
-            Bar("XPBar", hud, new Vector2(0.5f, 1f), new Vector2(0f, -16f), new Vector2(1000f, 26f),
-                new Color(0.08f, 0.09f, 0.12f, 0.9f), new Color(0.35f, 0.85f, 1f), out Image xpFill);
-
-            TextMeshProUGUI levelLabel = HudText("LevelLabel", hud, new Vector2(0f, 1f),
-                new Vector2(40f, -52f), new Vector2(200f, 50f), 34f, TextAlignmentOptions.Left, "1");
+            // ------------------------------------------------------------ top
 
             TextMeshProUGUI timerLabel = HudText("TimerLabel", hud, new Vector2(0.5f, 1f),
-                new Vector2(0f, -52f), new Vector2(300f, 50f), 32f, TextAlignmentOptions.Center, "0:00");
+                new Vector2(0f, -40f), new Vector2(300f, 56f), 38f, TextAlignmentOptions.Center, "0:00");
 
-            TextMeshProUGUI killsLabel = HudText("KillsLabel", hud, new Vector2(1f, 1f),
-                new Vector2(-40f, -52f), new Vector2(200f, 50f), 32f, TextAlignmentOptions.Right, "0");
+            TextMeshProUGUI killsLabel = KillBadge(hud);
 
-            // Under the timer: the wave counter is the run's progress bar, and
-            // without it a four-minute stage has no visible shape at all.
             TextMeshProUGUI waveLabel = HudText("WaveLabel", hud, new Vector2(0.5f, 1f),
                 new Vector2(0f, -96f), new Vector2(420f, 44f), 26f, TextAlignmentOptions.Center, "WAVE 1/8");
             waveLabel.color = new Color(0.75f, 0.78f, 0.85f);
 
             GameObject bossBanner = BuildBossBanner(hud);
 
-            Bar("HealthBar", hud, new Vector2(0f, 0f), new Vector2(40f, 40f), new Vector2(440f, 34f),
-                new Color(0.08f, 0.09f, 0.12f, 0.9f), new Color(0.9f, 0.3f, 0.32f), out Image healthFill);
+            // --------------------------------------------------------- bottom
 
-            TextMeshProUGUI healthLabel = HudText("HealthLabel", hud, new Vector2(0f, 0f),
-                new Vector2(40f, 80f), new Vector2(440f, 40f), 26f, TextAlignmentOptions.Left, "100/100");
+            // One plate holding health, level and the booster row. Grouping them
+            // is what makes the bottom edge read as a status bar rather than as
+            // three unrelated widgets that happen to be near each other.
+            RectTransform plate = UIChild("BottomBar", hud);
+            plate.anchorMin = new Vector2(0f, 0f);
+            plate.anchorMax = new Vector2(1f, 0f);
+            plate.pivot = new Vector2(0.5f, 0f);
+            plate.anchoredPosition = new Vector2(0f, 18f);
+            plate.sizeDelta = new Vector2(-28f, 210f);
+
+            var plateImage = plate.gameObject.AddComponent<Image>();
+            plateImage.sprite = UiSprite();
+            plateImage.type = Image.Type.Sliced;
+            plateImage.color = new Color(0.16f, 0.14f, 0.24f, 0.95f);
+            plateImage.raycastTarget = false;
+
+            BuildHealthRow(plate, out Image healthFill, out Image healthDelayed, out TextMeshProUGUI healthLabel);
+            BuildLevelRow(plate, out Image xpFill, out TextMeshProUGUI levelLabel, out TextMeshProUGUI xpLabel);
+            BuildSlotRow(plate, abilities);
 
             var runHud = hudGo.AddComponent<RunHUD>();
             Set(runHud, "levels", levels);
             Set(runHud, "playerHealth", health);
             Set(runHud, "weapon", weapon);
+            Set(runHud, "run", run);
+            Set(runHud, "healthFill", healthFill);
+            Set(runHud, "healthDelayedFill", healthDelayed);
+            Set(runHud, "healthLabel", healthLabel);
             Set(runHud, "xpFill", xpFill);
             Set(runHud, "levelLabel", levelLabel);
-            Set(runHud, "healthFill", healthFill);
-            Set(runHud, "healthLabel", healthLabel);
+            Set(runHud, "xpLabel", xpLabel);
             Set(runHud, "timerLabel", timerLabel);
             Set(runHud, "killsLabel", killsLabel);
             Set(runHud, "waveLabel", waveLabel);
             Set(runHud, "bossBanner", bossBanner);
             Set(runHud, "bossBannerSeconds", 2.5f);
-            Set(runHud, "run", run);
 
             BuildPriorityButton(hud, weapon);
         }
 
-        /// <summary>
-        /// The one moment the run announces itself. Starts inactive; RunHUD shows
-        /// it when the boss spawns and hides it on a timer.
-        /// </summary>
-        static GameObject BuildBossBanner(Transform hud)
+        /// <summary>Kill counter, top-left, on its own pill so it reads at a glance
+        /// against whatever is behind it.</summary>
+        static TextMeshProUGUI KillBadge(Transform hud)
         {
-            var go = new GameObject("BossBanner", typeof(RectTransform));
-            go.transform.SetParent(hud, false);
-            Place((RectTransform)go.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 160f),
-                  new Vector2(900f, 120f));
+            RectTransform badge = UIChild("KillBadge", hud);
+            Place(badge, new Vector2(0f, 1f), new Vector2(28f, -32f), new Vector2(150f, 62f));
 
-            TextMeshProUGUI text = Label(go, 72f, TextAlignmentOptions.Center, new Color(0.95f, 0.25f, 0.25f));
-            text.text = "BOSS";
+            var back = badge.gameObject.AddComponent<Image>();
+            back.sprite = UiSprite();
+            back.type = Image.Type.Sliced;
+            back.color = new Color(0.12f, 0.11f, 0.18f, 0.92f);
+            back.raycastTarget = false;
+
+            // Placeholder for a skull icon. A flat block still says "a count of
+            // something lives here"; swap the sprite when art lands.
+            RectTransform mark = UIChild("SkullMark", badge);
+            Place(mark, new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(34f, 34f));
+            var markImage = mark.gameObject.AddComponent<Image>();
+            markImage.sprite = UiSprite();
+            markImage.type = Image.Type.Sliced;
+            markImage.color = new Color(0.88f, 0.86f, 0.92f);
+            markImage.raycastTarget = false;
+
+            RectTransform textRect = UIChild("Count", badge);
+            textRect.anchorMin = new Vector2(0f, 0f);
+            textRect.anchorMax = new Vector2(1f, 1f);
+            textRect.offsetMin = new Vector2(54f, 0f);
+            textRect.offsetMax = new Vector2(-10f, 0f);
+
+            TextMeshProUGUI text = Label(textRect.gameObject, 34f, TextAlignmentOptions.Left, Color.white);
             text.fontStyle = FontStyles.Bold;
-
-            go.SetActive(false);
-            return go;
+            text.text = "0";
+            return text;
         }
 
-        // ----------------------------------------------------------- run end
-
-        static void BuildRunEndUI(Canvas canvas, RunController run)
+        /// <summary>
+        /// Health: a heart, a track, a delayed drain layer, then the live fill on
+        /// top. The delayed layer is what turns a big hit into a visible chunk
+        /// instead of the bar simply being shorter than it was.
+        /// </summary>
+        static void BuildHealthRow(RectTransform plate, out Image fill, out Image delayed,
+                                   out TextMeshProUGUI label)
         {
-            // Same shape as BuildDraftUI: the component sits on an always-active
-            // root and toggles a child panel. On the panel itself, OnEnable would
-            // never run while it starts hidden, so it would never subscribe to
-            // RunEnded and the end screen would silently never appear.
-            var rootGo = new GameObject("RunEndRoot", typeof(RectTransform));
-            rootGo.transform.SetParent(canvas.transform, false);
-            Stretch((RectTransform)rootGo.transform);
+            RectTransform heart = UIChild("Heart", plate);
+            Place(heart, new Vector2(0f, 1f), new Vector2(20f, -16f), new Vector2(46f, 46f));
+            var heartImage = heart.gameObject.AddComponent<Image>();
+            heartImage.sprite = UiSprite();
+            heartImage.type = Image.Type.Sliced;
+            heartImage.color = new Color(0.92f, 0.24f, 0.28f);
+            heartImage.raycastTarget = false;
 
-            var panel = new GameObject("Panel", typeof(RectTransform), typeof(CanvasGroup));
-            panel.transform.SetParent(rootGo.transform, false);
-            Stretch((RectTransform)panel.transform);
+            RectTransform track = UIChild("HealthTrack", plate);
+            Place(track, new Vector2(0f, 1f), new Vector2(76f, -16f), new Vector2(470f, 46f));
+            var trackImage = track.gameObject.AddComponent<Image>();
+            trackImage.sprite = UiSprite();
+            trackImage.type = Image.Type.Sliced;
+            trackImage.color = new Color(0.07f, 0.06f, 0.11f, 0.95f);
+            trackImage.raycastTarget = false;
 
-            var dim = panel.AddComponent<Image>();
-            dim.color = new Color(0.03f, 0.04f, 0.06f, 0.92f);
-            dim.sprite = UiSprite();
+            delayed = BarFill(track, "Delayed", new Color(0.95f, 0.55f, 0.35f, 0.8f));
+            fill = BarFill(track, "Fill", new Color(0.30f, 0.82f, 0.22f));
 
-            TextMeshProUGUI title = HudText("Title", panel.transform, new Vector2(0.5f, 0.5f),
-                new Vector2(0f, 300f), new Vector2(900f, 130f), 84f, TextAlignmentOptions.Center, "STAGE CLEAR");
-            title.fontStyle = FontStyles.Bold;
-
-            TextMeshProUGUI subtitle = HudText("Subtitle", panel.transform, new Vector2(0.5f, 0.5f),
-                new Vector2(0f, 200f), new Vector2(900f, 60f), 34f, TextAlignmentOptions.Center, "");
-            subtitle.color = new Color(0.72f, 0.75f, 0.82f);
-
-            // Monospaced-ish block via a left-aligned multi-line label: the rows
-            // line up because every label is padded in RunEndScreen, not here.
-            TextMeshProUGUI stats = HudText("Stats", panel.transform, new Vector2(0.5f, 0.5f),
-                new Vector2(0f, 40f), new Vector2(560f, 260f), 34f, TextAlignmentOptions.TopLeft, "");
-
-            TextMeshProUGUI coins = HudText("Coins", panel.transform, new Vector2(0.5f, 0.5f),
-                new Vector2(0f, -170f), new Vector2(600f, 90f), 56f, TextAlignmentOptions.Center, "+0");
-            coins.color = new Color(1f, 0.82f, 0.3f);
-
-            TextMeshProUGUI balance = HudText("Balance", panel.transform, new Vector2(0.5f, 0.5f),
-                new Vector2(0f, -228f), new Vector2(600f, 50f), 28f, TextAlignmentOptions.Center, "0 total");
-            balance.color = new Color(0.68f, 0.7f, 0.76f);
-
-            Button retry = BuildTextButton("RetryButton", panel.transform,
-                                           new Vector2(0.5f, 0.5f), new Vector2(0f, -320f),
-                                           new Vector2(420f, 110f), "RETRY");
-
-            var screen = rootGo.AddComponent<RunEndScreen>();
-            Set(screen, "run", run);
-            Set(screen, "panel", panel);
-            Set(screen, "canvasGroup", panel.GetComponent<CanvasGroup>());
-            Set(screen, "titleLabel", title);
-            Set(screen, "subtitleLabel", subtitle);
-            Set(screen, "statsLabel", stats);
-            Set(screen, "coinsLabel", coins);
-            Set(screen, "balanceLabel", balance);
-            Set(screen, "retryButton", retry);
-
-            // Inactive last: RunEndScreen.Awake also does this, but leaving the
-            // authored scene with a full-screen black panel switched on makes the
-            // scene unusable to edit.
-            panel.SetActive(false);
-        }
-
-        static Button BuildTextButton(string name, Transform parent, Vector2 anchor,
-                                      Vector2 position, Vector2 size, string caption)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            Place((RectTransform)go.transform, anchor, position, size);
-
-            var image = go.AddComponent<Image>();
-            image.sprite = UiSprite();
-            image.color = new Color(0.16f, 0.19f, 0.26f, 1f);
-
-            var button = go.AddComponent<Button>();
-            button.targetGraphic = image;
-
-            RectTransform labelRect = UIChild("Label", go.transform);
+            RectTransform labelRect = UIChild("HealthLabel", track);
             Stretch(labelRect);
-            TextMeshProUGUI label = Label(labelRect.gameObject, 40f, TextAlignmentOptions.Center, Color.white);
-            label.text = caption;
+            label = Label(labelRect.gameObject, 28f, TextAlignmentOptions.Center, Color.white);
+            label.fontStyle = FontStyles.Bold;
+            label.text = "100 / 100";
+        }
 
-            return button;
+        static void BuildLevelRow(RectTransform plate, out Image fill,
+                                  out TextMeshProUGUI levelLabel, out TextMeshProUGUI xpLabel)
+        {
+            RectTransform track = UIChild("LevelTrack", plate);
+            Place(track, new Vector2(0f, 1f), new Vector2(20f, -72f), new Vector2(526f, 34f));
+            var trackImage = track.gameObject.AddComponent<Image>();
+            trackImage.sprite = UiSprite();
+            trackImage.type = Image.Type.Sliced;
+            trackImage.color = new Color(0.07f, 0.06f, 0.11f, 0.95f);
+            trackImage.raycastTarget = false;
+
+            fill = BarFill(track, "Fill", new Color(0.42f, 0.62f, 1f));
+
+            RectTransform fractionRect = UIChild("XPLabel", track);
+            Stretch(fractionRect);
+            xpLabel = Label(fractionRect.gameObject, 22f, TextAlignmentOptions.Center, Color.white);
+            xpLabel.text = "0 / 5";
+
+            RectTransform levelRect = UIChild("LevelLabel", plate);
+            Place(levelRect, new Vector2(0f, 1f), new Vector2(20f, -112f), new Vector2(300f, 34f));
+            levelLabel = Label(levelRect.gameObject, 24f, TextAlignmentOptions.Left,
+                               new Color(0.78f, 0.80f, 0.88f));
+            levelLabel.text = "Level 1";
+        }
+
+        /// <summary>Four booster slots along the right of the bottom bar.</summary>
+        static void BuildSlotRow(RectTransform plate, AbilitySystem abilities)
+        {
+            const int SlotCount = 4;
+            const float Size = 92f;
+            const float Gap = 10f;
+
+            var slots = new AbilitySlot[SlotCount];
+
+            for (int i = 0; i < SlotCount; i++)
+            {
+                float x = -20f - (Size + Gap) * (SlotCount - 1 - i);
+                slots[i] = BuildSlot(plate, $"Slot{i + 1}", new Vector2(x, -16f), Size);
+            }
+
+            var slotObjects = new Object[SlotCount];
+            for (int i = 0; i < SlotCount; i++) slotObjects[i] = slots[i];
+
+            var bar = plate.gameObject.AddComponent<AbilitySlotBar>();
+            Set(bar, "abilities", abilities);
+            Set(bar, "unlockedSlots", SlotCount);
+            SetArray(bar, "slots", slotObjects);
+        }
+
+        static AbilitySlot BuildSlot(RectTransform parent, string name, Vector2 position, float size)
+        {
+            RectTransform root = UIChild(name, parent);
+            Place(root, new Vector2(1f, 1f), position, new Vector2(size, size));
+
+            var frame = root.gameObject.AddComponent<Image>();
+            frame.sprite = UiSprite();
+            frame.type = Image.Type.Sliced;
+            frame.color = new Color(0.18f, 0.16f, 0.26f);
+            frame.raycastTarget = false;
+
+            RectTransform iconRect = UIChild("Icon", root);
+            iconRect.anchorMin = Vector2.zero;
+            iconRect.anchorMax = Vector2.one;
+            iconRect.offsetMin = new Vector2(12f, 12f);
+            iconRect.offsetMax = new Vector2(-12f, -12f);
+            var icon = iconRect.gameObject.AddComponent<Image>();
+            icon.sprite = UiSprite();
+            icon.type = Image.Type.Sliced;
+            icon.raycastTarget = false;
+            icon.enabled = false;
+
+            // Radial sweep over the icon. Filled + Radial360 from the top is the
+            // convention every player already reads as a cooldown.
+            RectTransform sweepRect = UIChild("Cooldown", root);
+            sweepRect.anchorMin = Vector2.zero;
+            sweepRect.anchorMax = Vector2.one;
+            sweepRect.offsetMin = new Vector2(6f, 6f);
+            sweepRect.offsetMax = new Vector2(-6f, -6f);
+            var sweep = sweepRect.gameObject.AddComponent<Image>();
+            sweep.sprite = UiSprite();
+            sweep.type = Image.Type.Filled;
+            sweep.fillMethod = Image.FillMethod.Radial360;
+            sweep.fillOrigin = (int)Image.Origin360.Top;
+            sweep.fillClockwise = true;
+            sweep.fillAmount = 0f;
+            sweep.color = new Color(0.55f, 0.75f, 1f, 0.35f);
+            sweep.raycastTarget = false;
+
+            RectTransform levelRect = UIChild("Level", root);
+            Place(levelRect, new Vector2(1f, 0f), new Vector2(-6f, 4f), new Vector2(48f, 28f));
+            TextMeshProUGUI levelLabel = Label(levelRect.gameObject, 20f, TextAlignmentOptions.Right, Color.white);
+            levelLabel.fontStyle = FontStyles.Bold;
+
+            RectTransform lockRect = UIChild("Locked", root);
+            Stretch(lockRect);
+            var lockImage = lockRect.gameObject.AddComponent<Image>();
+            lockImage.sprite = UiSprite();
+            lockImage.type = Image.Type.Sliced;
+            lockImage.color = new Color(0.05f, 0.05f, 0.08f, 0.85f);
+            lockImage.raycastTarget = false;
+
+            RectTransform lockTextRect = UIChild("LockedLabel", lockRect);
+            Stretch(lockTextRect);
+            TextMeshProUGUI lockLabel = Label(lockTextRect.gameObject, 16f,
+                                              TextAlignmentOptions.Center, new Color(0.6f, 0.62f, 0.7f));
+            lockLabel.text = "LOCKED";
+            lockRect.gameObject.SetActive(false);
+
+            var slot = root.gameObject.AddComponent<AbilitySlot>();
+            Set(slot, "frame", frame);
+            Set(slot, "icon", icon);
+            Set(slot, "cooldownFill", sweep);
+            Set(slot, "levelLabel", levelLabel);
+            Set(slot, "lockedOverlay", lockRect.gameObject);
+            Set(slot, "lockedLabel", lockLabel);
+
+            return slot;
+        }
+
+        /// <summary>A stretched fill layer inside a bar track.</summary>
+        static Image BarFill(RectTransform track, string name, Color colour)
+        {
+            RectTransform rect = UIChild(name, track);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(4f, 4f);
+            rect.offsetMax = new Vector2(-4f, -4f);
+
+            var image = rect.gameObject.AddComponent<Image>();
+            image.sprite = UiSprite();
+            image.type = Image.Type.Filled;
+            image.fillMethod = Image.FillMethod.Horizontal;
+            image.fillAmount = 1f;
+            image.color = colour;
+            image.raycastTarget = false;
+            return image;
         }
 
         static void BuildPriorityButton(Transform hud, AutoShoot weapon)

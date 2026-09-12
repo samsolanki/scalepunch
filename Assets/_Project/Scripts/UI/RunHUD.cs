@@ -11,11 +11,12 @@ using ScalePunch.Run;
 namespace ScalePunch.UI
 {
     /// <summary>
-    /// In-run readouts: XP, level, health, elapsed time, kills.
+    /// In-run readouts: health, level progress, kills, timer.
     ///
-    /// The XP bar is the most important element on screen — it is the only
-    /// promise the run makes, so it belongs at the top edge, full width, where
-    /// a thumb cannot cover it.
+    /// Level progress is the most important element on screen — it is the only
+    /// promise the run makes — so it sits on the bottom bar next to health,
+    /// where a thumb is already looking, rather than at the top edge where it
+    /// competes with the kill counter.
     /// </summary>
     public class RunHUD : MonoBehaviour
     {
@@ -25,13 +26,27 @@ namespace ScalePunch.UI
         [SerializeField] AutoShoot weapon;
         [SerializeField] RunController run;
 
-        [Header("XP")]
-        [SerializeField] Image xpFill;
-        [SerializeField] TMP_Text levelLabel;
-
         [Header("Health")]
         [SerializeField] Image healthFill;
         [SerializeField] TMP_Text healthLabel;
+        [Tooltip("Trails the real value so a big hit reads as a chunk lost rather " +
+                 "than the bar teleporting.")]
+        [SerializeField] Image healthDelayedFill;
+        [SerializeField] float delayedDrainPerSecond = 0.55f;
+
+        [Header("Health colours")]
+        [SerializeField] Color healthyColour = new(0.30f, 0.82f, 0.22f);
+        [SerializeField] Color hurtColour = new(0.95f, 0.75f, 0.15f);
+        [SerializeField] Color criticalColour = new(0.90f, 0.22f, 0.22f);
+        [Range(0f, 1f)] [SerializeField] float hurtBelow = 0.55f;
+        [Range(0f, 1f)] [SerializeField] float criticalBelow = 0.25f;
+
+        [Header("Level")]
+        [SerializeField] Image xpFill;
+        [SerializeField] TMP_Text levelLabel;
+        [Tooltip("The fraction, e.g. \"3 / 5\". Without it the bar is a vibe, not " +
+                 "a target the player can count down.")]
+        [SerializeField] TMP_Text xpLabel;
 
         [Header("Run")]
         [SerializeField] TMP_Text timerLabel;
@@ -45,6 +60,7 @@ namespace ScalePunch.UI
         float _elapsed;
         int _kills;
         float _bannerRemaining;
+        float _delayed = 1f;
 
         void Awake()
         {
@@ -109,23 +125,52 @@ namespace ScalePunch.UI
                 if (_bannerRemaining <= 0f && bossBanner != null) bossBanner.SetActive(false);
             }
 
-            if (levels != null)
-            {
-                if (xpFill != null) xpFill.fillAmount = levels.Progress;
-                if (levelLabel != null) levelLabel.text = levels.Level.ToString();
-            }
-
-            if (playerHealth != null)
-            {
-                if (healthFill != null) healthFill.fillAmount = playerHealth.Normalised;
-                if (healthLabel != null)
-                    healthLabel.text = $"{Mathf.CeilToInt(playerHealth.Current)}/{Mathf.CeilToInt(playerHealth.Max)}";
-            }
+            TickHealth();
+            TickLevel();
 
             if (timerLabel != null)
                 timerLabel.text = $"{Mathf.FloorToInt(_elapsed / 60f):0}:{Mathf.FloorToInt(_elapsed % 60f):00}";
 
             if (killsLabel != null) killsLabel.text = _kills.ToString();
+        }
+
+        void TickHealth()
+        {
+            if (playerHealth == null) return;
+
+            float normalised = playerHealth.Normalised;
+
+            if (healthFill != null)
+            {
+                healthFill.fillAmount = normalised;
+
+                // Colour is the fastest read of "am I in trouble" — far faster
+                // than parsing two numbers while a crowd closes in.
+                healthFill.color = normalised <= criticalBelow ? criticalColour
+                                 : normalised <= hurtBelow ? hurtColour
+                                 : healthyColour;
+            }
+
+            if (healthDelayedFill != null)
+            {
+                _delayed = _delayed < normalised
+                    ? normalised
+                    : Mathf.MoveTowards(_delayed, normalised, delayedDrainPerSecond * Time.unscaledDeltaTime);
+
+                healthDelayedFill.fillAmount = _delayed;
+            }
+
+            if (healthLabel != null)
+                healthLabel.text = $"{Mathf.CeilToInt(playerHealth.Current)} / {Mathf.CeilToInt(playerHealth.Max)}";
+        }
+
+        void TickLevel()
+        {
+            if (levels == null) return;
+
+            if (xpFill != null) xpFill.fillAmount = levels.Progress;
+            if (levelLabel != null) levelLabel.text = $"Level {levels.Level}";
+            if (xpLabel != null) xpLabel.text = $"{levels.Current} / {levels.Required}";
         }
     }
 }
