@@ -160,6 +160,11 @@ namespace ScalePunch.EditorTools
             Set(weapon, "turret", turret.transform);
             Set(weapon, "muzzle", muzzle.transform);
             Set(weapon, "priority", AutoShoot.TargetPriority.Closest);
+            Set(weapon, "targetStickiness", 1f);
+            Set(weapon, "minFiringArc", 1.5f);
+            Set(weapon, "maxFiringArc", 25f);
+            Set(weapon, "maxLeadSeconds", 1f);
+            Set(weapon, "avoidOverkill", true);
 
             Set(levels, "curve", data.curve);
 

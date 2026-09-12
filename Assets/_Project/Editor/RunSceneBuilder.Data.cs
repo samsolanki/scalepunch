@@ -118,9 +118,12 @@ namespace ScalePunch.EditorTools
             set.pistol.inaccuracyDegrees = 1.0f;
 
             // Barely any steering. 220 deg/s let rounds visibly curve after a
-            // target, which reads as a guided missile, not a bullet. Just enough
-            // to correct for a Runner crossing the line of fire.
-            set.pistol.steerDegreesPerSecond = 45f;
+            // target, which reads as a guided missile, not a bullet.
+            //
+            // It used to be papering over pursuit aiming; the turret solves a real
+            // intercept now, so this only has to absorb a target that changes
+            // direction after the round is already in the air.
+            set.pistol.steerDegreesPerSecond = 35f;
 
             // Drafts fire on kill count, not collected XP, so a threshold reads
             // as exactly what it says: the first card at 5 zombies, the second

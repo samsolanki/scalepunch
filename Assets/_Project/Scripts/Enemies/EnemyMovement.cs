@@ -28,6 +28,7 @@ namespace ScalePunch.Enemies
         float _speedMultiplier = 1f;
         float _attackTimer;
         Vector3 _knockbackVelocity;
+        Vector3 _lastPosition;
         int _separationCursor;
 
         /// <summary>Who this zombie is walking toward. Scripted behaviours (the
@@ -43,6 +44,15 @@ namespace ScalePunch.Enemies
 
         public float Damage => _damage;
 
+        /// <summary>
+        /// Smoothed ground-plane velocity, for the turret's intercept solve.
+        ///
+        /// Smoothed rather than raw: a single frame's delta spikes hard during
+        /// knockback and separation jitter, and feeding that straight into a
+        /// lead calculation makes the gun aim at empty floor.
+        /// </summary>
+        public Vector3 Velocity { get; private set; }
+
         public void Configure(EnemyDefinition definition, float damage, Transform target)
         {
             _definition = definition;
@@ -54,6 +64,8 @@ namespace ScalePunch.Enemies
             _targetHealth = target != null ? target.GetComponent<Health>() : null;
             _attackTimer = 0f;
             _knockbackVelocity = Vector3.zero;
+            _lastPosition = transform.position;
+            Velocity = Vector3.zero;
             ExternalControl = false;
         }
 
@@ -110,6 +122,15 @@ namespace ScalePunch.Enemies
                 Vector3 step = toTarget.normalized * (_definition.moveSpeed * _speedMultiplier * dt);
                 position += step + Separation() * (separationStrength * dt);
             }
+
+            Vector3 frameVelocity = (position - _lastPosition) / dt;
+            frameVelocity.y = 0f;
+            _lastPosition = position;
+
+            // ~5 frame smoothing. Enough to shrug off separation jitter, short
+            // enough that a Runner changing direction is tracked within a few
+            // frames rather than half a second.
+            Velocity = Vector3.Lerp(Velocity, frameVelocity, 1f - Mathf.Exp(-12f * dt));
 
             transform.position = position;
 

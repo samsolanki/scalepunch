@@ -24,6 +24,7 @@ namespace ScalePunch.Weapons
         float _rangeRemaining;
         float _lifeRemaining;
         float _lifestealFraction;
+        bool _reserved;
         Health _shooter;
         bool _isCrit;
         int _pierceRemaining;
@@ -57,6 +58,11 @@ namespace ScalePunch.Weapons
             _shooter = shooter;
             _lifestealFraction = lifestealFraction;
             _live = true;
+
+            // Claim this round's damage against the target for as long as it is
+            // in the air, so the turret can see the kill coming and move on.
+            _reserved = target != null && !target.IsDead;
+            if (_reserved) target.ReserveDamage(damage);
 
             _alreadyHit.Clear();
             if (trail != null) trail.Clear();
@@ -129,10 +135,29 @@ namespace ScalePunch.Weapons
         void Expire()
         {
             if (!_live) return;
+
             _live = false;
+            ReleaseReservation();
             Expired?.Invoke(this);
         }
 
-        void OnDisable() => _live = false;
+        /// <summary>
+        /// Hands the claim back. Must run on every exit path — a round that dies
+        /// without releasing leaves its target permanently looking doomed, and
+        /// the turret never shoots it again.
+        /// </summary>
+        void ReleaseReservation()
+        {
+            if (!_reserved) return;
+
+            _reserved = false;
+            if (_target != null) _target.ReleaseDamage(_damage);
+        }
+
+        void OnDisable()
+        {
+            _live = false;
+            ReleaseReservation();
+        }
     }
 }

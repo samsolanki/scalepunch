@@ -44,11 +44,27 @@ namespace ScalePunch.Player
         [SerializeField] TargetPriority priority = TargetPriority.Closest;
         [Tooltip("Degrees per second the turret slews. The gun does not fire until it is on target.")]
         [SerializeField] float turnSpeed = 720f;
-        [Tooltip("How far off-aim the turret may be and still fire, in degrees.")]
-        [Range(1f, 90f)] [SerializeField] float firingArc = 12f;
-        [Tooltip("Re-picking a target every frame makes the turret twitch between " +
-                 "equidistant zombies. It holds its target until the target dies or leaves this radius.")]
-        [SerializeField] float targetStickiness = 1.15f;
+        [Tooltip("Floor on the firing arc. Without one, a distant target's angular " +
+                 "size shrinks below the turret's ability to settle and it never fires.")]
+        [Range(0.25f, 10f)] [SerializeField] float minFiringArc = 1.5f;
+        [Tooltip("Ceiling on the firing arc, for targets close enough to be huge on screen.")]
+        [Range(5f, 90f)] [SerializeField] float maxFiringArc = 25f;
+        [Tooltip("Cap on predicted lead time, in seconds. A target whose intercept is " +
+                 "further out than this is not worth leading — it will have changed " +
+                 "direction by then.")]
+        [SerializeField] float maxLeadSeconds = 1f;
+        [Tooltip("Skip zombies with enough damage already in flight to kill them. " +
+                 "Turning this off makes the turret dump its whole magazine into the " +
+                 "first thing it sees.")]
+        [SerializeField] bool avoidOverkill = true;
+        [Tooltip("Multiplier on the retention radius. Holding the target until it " +
+                 "dies or leaves range is what stops the turret twitching between " +
+                 "equidistant zombies — that alone needs no margin.\n\n" +
+                 "Keep this at 1. Above it, the turret keeps tracking a target that " +
+                 "has drifted past the edge of the ring, and since a round expires " +
+                 "at the ring it can neither hit that target nor pick a closer one: " +
+                 "the gun simply stops firing.")]
+        [Range(1f, 1.5f)] [SerializeField] float targetStickiness = 1f;
 
         [Header("Debug")]
         [SerializeField] bool drawGizmos = true;
@@ -104,10 +120,10 @@ namespace ScalePunch.Player
             AcquireTarget();
             if (CurrentTarget == null) return;
 
-            bool onTarget = SlewToTarget();
+            bool onTarget = SlewToTarget(Range, out Vector3 aimPoint);
             if (_cooldown > 0f || !onTarget) return;
 
-            Fire();
+            Fire(aimPoint);
             _cooldown = interval;
         }
 
@@ -115,21 +131,25 @@ namespace ScalePunch.Player
         {
             float range = Range;
 
-            // Keep the current target while it is alive and still roughly in
-            // range — the stickiness margin stops the turret oscillating between
-            // two zombies at nearly identical distance.
-            if (CurrentTarget != null && !CurrentTarget.IsDead)
+            // Keep the current target while it is alive, not already dead on
+            // arrival, and still roughly in range. The stickiness margin stops the
+            // turret oscillating between two zombies at nearly identical distance.
+            if (CurrentTarget != null && !CurrentTarget.IsDead && !IsDoomed(CurrentTarget))
             {
                 float distSqr = (CurrentTarget.transform.position - transform.position).sqrMagnitude;
                 if (distSqr <= range * range * targetStickiness) return;
             }
 
-            CurrentTarget = priority == TargetPriority.Closest
-                ? EnemyRegistry.FindNearest(transform.position, range)
-                : SelectByPriority(range);
+            CurrentTarget = SelectTarget(range);
         }
 
-        Enemy SelectByPriority(float range)
+        bool IsDoomed(Enemy enemy) => avoidOverkill && enemy.IsDoomed;
+
+        /// <summary>
+        /// One filtered scan for every priority, so the doomed-target filter
+        /// cannot apply to three of the four modes and silently not the fourth.
+        /// </summary>
+        Enemy SelectTarget(float range)
         {
             var all = EnemyRegistry.All;
             float rangeSqr = range * range;
@@ -140,6 +160,7 @@ namespace ScalePunch.Player
             {
                 Enemy e = all[i];
                 if (e == null || e.IsDead) continue;
+                if (IsDoomed(e)) continue;
 
                 float distSqr = (e.transform.position - transform.position).sqrMagnitude;
                 if (distSqr > rangeSqr) continue;
@@ -159,22 +180,105 @@ namespace ScalePunch.Player
             return best;
         }
 
-        /// <summary>Turns the turret toward the target. Returns true once the
-        /// aim error is inside the firing arc.</summary>
-        bool SlewToTarget()
+        /// <summary>
+        /// Turns the turret toward where the target is *going to be*, and reports
+        /// whether a shot fired now would actually connect.
+        ///
+        /// Three separate things had to be true for a round to be wasted, and all
+        /// three were:
+        ///
+        /// 1. The turret aimed at the target's current position and left the rest
+        ///    to the round's weak homing. That is pursuit, not interception, and
+        ///    pursuit always trails a crossing target — a Runner at 4.5 m/s moves
+        ///    0.9 m during a 9 m flight, against a 0.55 m hit radius.
+        /// 2. The firing arc was a flat 12 degrees. At 9 m that is 1.9 m of lateral
+        ///    error allowed against a target half a metre wide.
+        /// 3. Target stickiness let a zombie sit 7% beyond the engagement radius
+        ///    while rounds were still given exactly that radius as their range
+        ///    budget — so every shot at a sticky target expired short of it.
+        /// </summary>
+        bool SlewToTarget(float range, out Vector3 aimPoint)
         {
-            Vector3 toTarget = CurrentTarget.transform.position - turret.position;
-            toTarget.y = 0f;
-            if (toTarget.sqrMagnitude < 0.0001f) return false;
+            Vector3 origin = muzzle.position;
+            Vector3 targetPosition = CurrentTarget.transform.position;
+            Vector3 targetVelocity = CurrentTarget.Movement != null
+                ? CurrentTarget.Movement.Velocity
+                : Vector3.zero;
 
-            Quaternion desired = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+            float speed = weapon != null ? weapon.SpeedFor(stats.Stats) : stats.Get(StatType.ProjectileSpeed);
+            aimPoint = Intercept(origin, targetPosition, targetVelocity, speed);
+
+            Vector3 toAim = aimPoint - turret.position;
+            toAim.y = 0f;
+            if (toAim.sqrMagnitude < 0.0001f) return false;
+
+            Quaternion desired = Quaternion.LookRotation(toAim.normalized, Vector3.up);
             turret.rotation = Quaternion.RotateTowards(
                 turret.rotation, desired, turnSpeed * Time.deltaTime);
 
-            return Quaternion.Angle(turret.rotation, desired) <= firingArc;
+            // A round cannot be fired past the edge of the ring, so an intercept
+            // beyond it is a guaranteed miss. Hold fire and keep tracking.
+            Vector3 toAimFromMuzzle = aimPoint - origin;
+            toAimFromMuzzle.y = 0f;
+            float distance = toAimFromMuzzle.magnitude;
+            if (distance > range) return false;
+
+            // The arc is the target's angular size, not a fixed number: half a
+            // metre of body is 3.5 degrees at 9 m and 15 at 2 m, and one constant
+            // cannot be right at both.
+            float hitRadius = weapon != null ? weapon.hitRadius : 0.5f;
+            float angularSize = Mathf.Atan2(hitRadius, Mathf.Max(0.01f, distance)) * Mathf.Rad2Deg;
+            float allowed = Mathf.Clamp(angularSize, minFiringArc, maxFiringArc);
+
+            return Quaternion.Angle(turret.rotation, desired) <= allowed;
         }
 
-        void Fire()
+        /// <summary>
+        /// First-order intercept: where a round leaving now at <paramref name="speed"/>
+        /// meets a target moving at constant velocity.
+        ///
+        /// Falls back to the target's current position when there is no solution —
+        /// a target outrunning the round, or closing straight down the barrel
+        /// where leading it changes nothing.
+        /// </summary>
+        Vector3 Intercept(Vector3 origin, Vector3 targetPosition, Vector3 targetVelocity, float speed)
+        {
+            Vector3 delta = targetPosition - origin;
+            delta.y = 0f;
+            targetVelocity.y = 0f;
+
+            float a = Vector3.Dot(targetVelocity, targetVelocity) - speed * speed;
+            float b = 2f * Vector3.Dot(delta, targetVelocity);
+            float c = Vector3.Dot(delta, delta);
+            float time;
+
+            if (Mathf.Abs(a) < 0.0001f)
+            {
+                // Target speed equals round speed — the quadratic degenerates.
+                if (Mathf.Abs(b) < 0.0001f) return targetPosition;
+                time = -c / b;
+            }
+            else
+            {
+                float discriminant = b * b - 4f * a * c;
+                if (discriminant < 0f) return targetPosition;
+
+                float root = Mathf.Sqrt(discriminant);
+                float t1 = (-b + root) / (2f * a);
+                float t2 = (-b - root) / (2f * a);
+
+                // Soonest positive intercept.
+                time = Mathf.Min(t1, t2);
+                if (time < 0f) time = Mathf.Max(t1, t2);
+            }
+
+            if (time < 0f) return targetPosition;
+
+            time = Mathf.Min(time, maxLeadSeconds);
+            return targetPosition + targetVelocity * time;
+        }
+
+        void Fire(Vector3 aimPoint)
         {
             if (weapon == null || !ProjectileService.Exists) return;
 
@@ -187,7 +291,13 @@ namespace ScalePunch.Player
             int rounds = RoundsThisShot(sheet);
 
             Vector3 origin = muzzle.position;
-            Vector3 aim = turret.forward;
+
+            // Fire at the solved intercept, not simply along the barrel. The
+            // turret may still be a fraction of a degree off after its slew, and
+            // at 9 m that fraction is the difference between a hit and a miss.
+            Vector3 aim = aimPoint - origin;
+            aim.y = 0f;
+            aim = aim.sqrMagnitude < 0.0001f ? turret.forward : aim.normalized;
 
             for (int i = 0; i < rounds; i++)
             {

@@ -75,6 +75,26 @@ The builder prints the ladder at wave 0 and wave 8 on every rebuild. If those
 two columns disagree, scaling is on and the ladder is a wave-0 promise the game
 stops keeping.
 
+### Why rounds used to miss
+
+Three independent faults, all of which had to be fixed for "one bullet, one
+Shambler" to hold in practice rather than only on paper:
+
+| Fault | Cost |
+|---|---|
+| Aimed at the target's **current** position | A Runner moves 0.90 m during a 9 m flight; the hit radius is 0.55 m |
+| Firing arc was a flat **12°** | 1.91 m of allowed lateral error at 9 m, against a target 0.55 m wide |
+| Target stickiness let a zombie sit at **9.65 m** while rounds expire at 9 m | Every shot at a drifted target died 0.65 m short |
+
+Now: the turret solves a first-order **intercept** and fires at where the target
+will be; the firing arc is the target's **angular size** (3.5° at 9 m, 15° at
+2 m) rather than a constant; and it holds fire entirely when the intercept falls
+outside the ring.
+
+Rounds also **reserve their damage** against the target while in flight, so the
+turret can see a kill coming and move on instead of emptying four rounds into a
+one-bullet Shambler.
+
 ### What the prototype actually is
 
 Stationary player, auto-fire, zombies arriving forever on an accelerating timer.

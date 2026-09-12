@@ -15,6 +15,24 @@ namespace ScalePunch.Enemies
         public EnemyDefinition Definition { get; private set; }
         public Health Health => health;
         public EnemyMovement Movement => movement;
+
+        /// <summary>
+        /// Damage already in the air toward this zombie.
+        ///
+        /// Without it the turret empties four rounds into a one-bullet Shambler
+        /// before the first one lands, because from the targeting code's point of
+        /// view the zombie is at full health until impact. Three of those rounds
+        /// are wasted and the zombie behind it walks in free.
+        /// </summary>
+        public float IncomingDamage { get; private set; }
+
+        /// <summary>True when enough damage is already in flight to kill it.</summary>
+        public bool IsDoomed => !IsDead && IncomingDamage >= health.Current;
+
+        public void ReserveDamage(float amount) => IncomingDamage += Mathf.Max(0f, amount);
+
+        public void ReleaseDamage(float amount)
+            => IncomingDamage = Mathf.Max(0f, IncomingDamage - Mathf.Max(0f, amount));
         public bool IsDead => health.IsDead;
 
         /// <summary>Raised on death so the spawner can pool it. Passed the
@@ -50,6 +68,10 @@ namespace ScalePunch.Enemies
                           float damageMultiplier, Transform target)
         {
             Definition = definition;
+
+            // Pooled: a stale reservation from a previous life would make a fresh
+            // zombie look doomed and never be shot at.
+            IncomingDamage = 0f;
 
             health.Init(definition.HPAtWave(wave, hpMultiplier), definition.armor);
             movement.Configure(definition, definition.DamageAtWave(wave, damageMultiplier), target);
