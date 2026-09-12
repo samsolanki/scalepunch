@@ -218,16 +218,25 @@ namespace ScalePunch.Player
         /// </summary>
         bool SlewToTarget(float range, out Vector3 aimPoint)
         {
-            Vector3 origin = muzzle.position;
+            // Solved from the turret's pivot, never from the muzzle.
+            //
+            // The muzzle sits 1.16 m out along the barrel and swings on that
+            // radius as the turret turns, while zombies attack from 1.4 m. Once
+            // one closes inside that, the muzzle can end up level with or past it
+            // and the muzzle-to-target vector flips — the turret whips 180 degrees
+            // and the shot leaves backwards. Rotating about the pivot and merely
+            // *spawning* at the barrel tip is how a turret actually works, and it
+            // has no degenerate case.
+            Vector3 origin = turret.position;
             Vector3 targetPosition = CurrentTarget.transform.position;
             Vector3 targetVelocity = CurrentTarget.Movement != null
                 ? CurrentTarget.Movement.Velocity
                 : Vector3.zero;
 
             float speed = weapon != null ? weapon.SpeedFor(stats.Stats) : stats.Get(StatType.ProjectileSpeed);
-            aimPoint = Intercept(origin, targetPosition, targetVelocity, speed);
+            aimPoint = Ballistics.Intercept(origin, targetPosition, targetVelocity, speed, maxLeadSeconds);
 
-            Vector3 toAim = aimPoint - turret.position;
+            Vector3 toAim = aimPoint - origin;
             toAim.y = 0f;
             if (toAim.sqrMagnitude < 0.0001f) return false;
 
@@ -237,9 +246,7 @@ namespace ScalePunch.Player
 
             // A round cannot be fired past the edge of the ring, so an intercept
             // beyond it is a guaranteed miss. Hold fire and keep tracking.
-            Vector3 toAimFromMuzzle = aimPoint - origin;
-            toAimFromMuzzle.y = 0f;
-            float distance = toAimFromMuzzle.magnitude;
+            float distance = toAim.magnitude;
             if (distance > range) return false;
 
             // The arc is the target's angular size, not a fixed number: half a
@@ -261,51 +268,6 @@ namespace ScalePunch.Player
             return Quaternion.Angle(turret.rotation, desired) <= allowed;
         }
 
-        /// <summary>
-        /// First-order intercept: where a round leaving now at <paramref name="speed"/>
-        /// meets a target moving at constant velocity.
-        ///
-        /// Falls back to the target's current position when there is no solution —
-        /// a target outrunning the round, or closing straight down the barrel
-        /// where leading it changes nothing.
-        /// </summary>
-        Vector3 Intercept(Vector3 origin, Vector3 targetPosition, Vector3 targetVelocity, float speed)
-        {
-            Vector3 delta = targetPosition - origin;
-            delta.y = 0f;
-            targetVelocity.y = 0f;
-
-            float a = Vector3.Dot(targetVelocity, targetVelocity) - speed * speed;
-            float b = 2f * Vector3.Dot(delta, targetVelocity);
-            float c = Vector3.Dot(delta, delta);
-            float time;
-
-            if (Mathf.Abs(a) < 0.0001f)
-            {
-                // Target speed equals round speed — the quadratic degenerates.
-                if (Mathf.Abs(b) < 0.0001f) return targetPosition;
-                time = -c / b;
-            }
-            else
-            {
-                float discriminant = b * b - 4f * a * c;
-                if (discriminant < 0f) return targetPosition;
-
-                float root = Mathf.Sqrt(discriminant);
-                float t1 = (-b + root) / (2f * a);
-                float t2 = (-b - root) / (2f * a);
-
-                // Soonest positive intercept.
-                time = Mathf.Min(t1, t2);
-                if (time < 0f) time = Mathf.Max(t1, t2);
-            }
-
-            if (time < 0f) return targetPosition;
-
-            time = Mathf.Min(time, maxLeadSeconds);
-            return targetPosition + targetVelocity * time;
-        }
-
         void Fire(Vector3 aimPoint)
         {
             if (weapon == null || !ProjectileService.Exists) return;
@@ -318,12 +280,13 @@ namespace ScalePunch.Player
             int pierce = Mathf.RoundToInt(sheet.Get(StatType.Pierce));
             int rounds = RoundsThisShot(sheet);
 
+            // Spawns at the barrel tip, but flies along the pivot-to-intercept
+            // line the turret was aimed down — the same line, once the slew has
+            // settled, and free of the close-range flip that using the muzzle as
+            // the origin introduces.
             Vector3 origin = muzzle.position;
 
-            // Fire at the solved intercept, not simply along the barrel. The
-            // turret may still be a fraction of a degree off after its slew, and
-            // at 9 m that fraction is the difference between a hit and a miss.
-            Vector3 aim = aimPoint - origin;
+            Vector3 aim = aimPoint - turret.position;
             aim.y = 0f;
             aim = aim.sqrMagnitude < 0.0001f ? turret.forward : aim.normalized;
 

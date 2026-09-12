@@ -25,6 +25,7 @@ namespace ScalePunch.Weapons
         float _lifeRemaining;
         float _lifestealFraction;
         bool _reserved;
+        bool _connected;
         Health _shooter;
         bool _isCrit;
         int _pierceRemaining;
@@ -64,6 +65,9 @@ namespace ScalePunch.Weapons
             _reserved = target != null && !target.IsDead;
             if (_reserved) target.ReserveDamage(damage);
 
+            _connected = false;
+            WeaponTelemetry.ReportFired();
+
             _alreadyHit.Clear();
             if (trail != null) trail.Clear();
         }
@@ -96,17 +100,32 @@ namespace ScalePunch.Weapons
             transform.rotation = Quaternion.LookRotation(_direction, Vector3.up);
         }
 
+        /// <summary>
+        /// Steers toward a freshly solved intercept, not toward where the target
+        /// currently stands.
+        ///
+        /// Chasing the current position is pursuit guidance, and pursuit always
+        /// curves in behind a crossing target. Against the turret's lead it was
+        /// worse than useless: the turret aimed at where the zombie would be and
+        /// this dragged the round back to where it was, erasing the lead a frame
+        /// at a time. Re-solving keeps the round on an interception course as the
+        /// target manoeuvres, which is the only thing homing should be doing.
+        /// </summary>
         void Steer(float dt)
         {
             if (_steerDegPerSec <= 0f) return;
             if (_target == null || _target.IsDead) return;
 
-            Vector3 toTarget = _target.transform.position - transform.position;
-            toTarget.y = 0f;
-            if (toTarget.sqrMagnitude < 0.0001f) return;
+            Vector3 targetVelocity = _target.Movement != null ? _target.Movement.Velocity : Vector3.zero;
+            Vector3 aimPoint = Ballistics.Intercept(transform.position, _target.transform.position,
+                                                    targetVelocity, _speed);
+
+            Vector3 toAim = aimPoint - transform.position;
+            toAim.y = 0f;
+            if (toAim.sqrMagnitude < 0.0001f) return;
 
             _direction = Vector3.RotateTowards(
-                _direction, toTarget.normalized,
+                _direction, toAim.normalized,
                 _steerDegPerSec * Mathf.Deg2Rad * dt, 0f).normalized;
         }
 
@@ -120,6 +139,7 @@ namespace ScalePunch.Weapons
                 if (hit == null) return;
 
                 _alreadyHit.Add(hit);
+                _connected = true;
                 hit.Health.TakeDamage(new DamageInfo(_damage, _isCrit, from, gameObject));
 
                 // Lifesteal resolves at the point of impact, not the point of
@@ -137,6 +157,10 @@ namespace ScalePunch.Weapons
             if (!_live) return;
 
             _live = false;
+
+            if (_connected) WeaponTelemetry.ReportHit();
+            else WeaponTelemetry.ReportExpired();
+
             ReleaseReservation();
             Expired?.Invoke(this);
         }

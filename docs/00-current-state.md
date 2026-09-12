@@ -86,10 +86,24 @@ Shambler" to hold in practice rather than only on paper:
 | Firing arc was a flat **12°** | 1.91 m of allowed lateral error at 9 m, against a target 0.55 m wide |
 | Target stickiness let a zombie sit at **9.65 m** while rounds expire at 9 m | Every shot at a drifted target died 0.65 m short |
 
-Now: the turret solves a first-order **intercept** and fires at where the target
-will be; the firing arc is the target's **angular size** (3.5° at 9 m, 15° at
-2 m) rather than a constant; and it holds fire entirely when the intercept falls
-outside the ring.
+Two more surfaced only after those were fixed, because each was a system that
+was correct on its own:
+
+| Fault | Cost |
+|---|---|
+| The round's homing steered toward the target's **current** position | Pursuit guidance, running every frame, erasing the turret's lead a frame at a time |
+| Aim was solved from the **muzzle**, 1.16 m out along the barrel | Zombies attack from 1.4 m; once inside that the muzzle-to-target vector flips and the turret whips 180° |
+
+Now: one shared `Ballistics.Intercept` serves the turret *and* the round, so the
+two cannot disagree; the round re-solves its intercept as it flies rather than
+chasing where the target stood; aim is solved about the turret **pivot** with the
+round merely *spawning* at the barrel tip; the firing arc is the target's angular
+size plus half of what the round can steer out; and it holds fire when the
+intercept falls outside the ring.
+
+`WeaponTelemetry` logs hits against rounds fired every 50 shots. Under ~85%
+against walkers means aiming is wrong, not unlucky — this bug survived two fixes
+that each sounded right, and a number would have settled it immediately.
 
 Rounds **reserve their damage** against the target while in flight. That
 reservation is a **preference, not an exclusion**:
