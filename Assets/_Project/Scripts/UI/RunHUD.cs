@@ -41,7 +41,9 @@ namespace ScalePunch.UI
         [Range(0f, 1f)] [SerializeField] float hurtBelow = 0.55f;
         [Range(0f, 1f)] [SerializeField] float criticalBelow = 0.25f;
 
-        [Header("Level")]
+        [Header("Level track")]
+        [Tooltip("Kills toward the next level. One progression drives the draft AND " +
+                 "the spawn ramp, so this single bar is the run's whole shape.")]
         [SerializeField] Image xpFill;
         [SerializeField] TMP_Text levelLabel;
         [Tooltip("The fraction, e.g. \"3 / 5\". Without it the bar is a vibe, not " +
@@ -50,6 +52,7 @@ namespace ScalePunch.UI
 
         [Header("Run")]
         [SerializeField] TMP_Text timerLabel;
+        [Tooltip("Total kills this run — a running tally, not progress.")]
         [SerializeField] TMP_Text killsLabel;
         [SerializeField] TMP_Text waveLabel;
 
@@ -100,7 +103,9 @@ namespace ScalePunch.UI
 
         void OnWaveStarted(int index, int total)
         {
-            if (waveLabel != null) waveLabel.text = $"WAVE {index + 1}/{total}";
+            // "Level", not "Wave": the spawn ramp and the draft advance on the
+            // same number now, and two names for one thing is one too many.
+            if (waveLabel != null) waveLabel.text = $"LEVEL {index + 1}/{total}";
         }
 
         void OnBossSpawned(Enemy boss)
@@ -169,7 +174,7 @@ namespace ScalePunch.UI
             if (levels == null) return;
 
             if (xpFill != null) xpFill.fillAmount = levels.Progress;
-            if (levelLabel != null) levelLabel.text = $"Level {levels.Level}";
+            if (levelLabel != null) levelLabel.text = $"LV {levels.Level}";
             if (xpLabel != null) xpLabel.text = $"{levels.Current} / {levels.Required}";
         }
     }

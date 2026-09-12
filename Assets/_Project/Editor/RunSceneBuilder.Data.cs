@@ -494,8 +494,8 @@ namespace ScalePunch.EditorTools
             const float BaseFireRate = 3f;              // StatSheet FireRate
             float roundsPerMinute = BaseFireRate * 60f;
 
-            var sb = new System.Text.StringBuilder("[ScalePunch] Spawn ramp\n");
-            sb.Append("  wave  interval  burst  spawn/min  clear/min  mix\n");
+            var sb = new System.Text.StringBuilder("[ScalePunch] Spawn ramp (level-driven)\n");
+            sb.Append(" level  interval  burst  spawn/min  clear/min  mix\n");
 
             int overrunWave = 0;
 
@@ -515,9 +515,9 @@ namespace ScalePunch.EditorTools
             }
 
             sb.Append(overrunWave > 0
-                ? $"  -> an un-upgraded player falls behind at wave {overrunWave}. " +
+                ? $"  -> an un-upgraded player falls behind at level {overrunWave}. " +
                   "Upgrades have to cover the gap from there."
-                : "  -> the base loadout keeps up at every sampled wave; the ramp may be too soft.");
+                : "  -> the base loadout keeps up at every sampled level; the ramp may be too soft.");
 
             Debug.Log(sb.ToString());
         }

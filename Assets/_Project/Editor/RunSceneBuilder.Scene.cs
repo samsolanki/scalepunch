@@ -329,13 +329,15 @@ namespace ScalePunch.EditorTools
 
             // ------------------------------------------------------------ top
 
-            TextMeshProUGUI timerLabel = HudText("TimerLabel", hud, new Vector2(0.5f, 1f),
-                new Vector2(0f, -40f), new Vector2(300f, 56f), 38f, TextAlignmentOptions.Center, "0:00");
+            BuildLevelTrack(hud, out Image xpFill, out TextMeshProUGUI levelLabel,
+                            out TextMeshProUGUI xpLabel, out TextMeshProUGUI killsLabel);
 
-            TextMeshProUGUI killsLabel = KillBadge(hud);
+            TextMeshProUGUI timerLabel = HudText("TimerLabel", hud, new Vector2(0.5f, 1f),
+                new Vector2(0f, -104f), new Vector2(300f, 44f), 28f, TextAlignmentOptions.Center, "0:00");
+            timerLabel.color = new Color(0.62f, 0.65f, 0.74f);
 
             TextMeshProUGUI waveLabel = HudText("WaveLabel", hud, new Vector2(0.5f, 1f),
-                new Vector2(0f, -96f), new Vector2(420f, 44f), 26f, TextAlignmentOptions.Center, "WAVE 1/8");
+                new Vector2(0f, -146f), new Vector2(420f, 40f), 24f, TextAlignmentOptions.Center, "LEVEL 1/8");
             waveLabel.color = new Color(0.75f, 0.78f, 0.85f);
 
             GameObject bossBanner = BuildBossBanner(hud);
@@ -350,7 +352,7 @@ namespace ScalePunch.EditorTools
             plate.anchorMax = new Vector2(1f, 0f);
             plate.pivot = new Vector2(0.5f, 0f);
             plate.anchoredPosition = new Vector2(0f, 18f);
-            plate.sizeDelta = new Vector2(-28f, 210f);
+            plate.sizeDelta = new Vector2(-28f, 140f);
 
             var plateImage = plate.gameObject.AddComponent<Image>();
             plateImage.sprite = UiSprite();
@@ -359,7 +361,6 @@ namespace ScalePunch.EditorTools
             plateImage.raycastTarget = false;
 
             BuildHealthRow(plate, out Image healthFill, out Image healthDelayed, out TextMeshProUGUI healthLabel);
-            BuildLevelRow(plate, out Image xpFill, out TextMeshProUGUI levelLabel, out TextMeshProUGUI xpLabel);
             BuildSlotRow(plate, abilities);
 
             var runHud = hudGo.AddComponent<RunHUD>();
@@ -382,12 +383,63 @@ namespace ScalePunch.EditorTools
             BuildPriorityButton(hud, weapon);
         }
 
-        /// <summary>Kill counter, top-left, on its own pill so it reads at a glance
+        /// <summary>
+        /// The run's whole shape in one bar: a level badge, kills toward the next
+        /// level, and the running total.
+        ///
+        /// Top edge and full width because it is the only promise the run makes,
+        /// and because one progression now drives both the draft and the spawn
+        /// ramp — there is nothing else competing for the position.
+        /// </summary>
+        static void BuildLevelTrack(Transform hud, out Image fill, out TextMeshProUGUI levelLabel,
+                                    out TextMeshProUGUI fractionLabel, out TextMeshProUGUI killsLabel)
+        {
+            RectTransform track = UIChild("LevelTrack", hud);
+            track.anchorMin = new Vector2(0f, 1f);
+            track.anchorMax = new Vector2(1f, 1f);
+            track.pivot = new Vector2(0.5f, 1f);
+            track.anchoredPosition = new Vector2(0f, -26f);
+            track.sizeDelta = new Vector2(-160f, 52f);
+
+            var back = track.gameObject.AddComponent<Image>();
+            back.sprite = UiSprite();
+            back.type = Image.Type.Sliced;
+            back.color = new Color(0.07f, 0.06f, 0.11f, 0.95f);
+            back.raycastTarget = false;
+
+            fill = BarFill(track, "Fill", new Color(0.42f, 0.62f, 1f));
+
+            RectTransform fractionRect = UIChild("Fraction", track);
+            Stretch(fractionRect);
+            fractionLabel = Label(fractionRect.gameObject, 26f, TextAlignmentOptions.Center, Color.white);
+            fractionLabel.fontStyle = FontStyles.Bold;
+            fractionLabel.text = "0 / 5";
+
+            // Level badge overhangs the left end of the bar, so the number reads
+            // as owning the track rather than floating beside it.
+            RectTransform badge = UIChild("LevelBadge", track);
+            Place(badge, new Vector2(0f, 0.5f), new Vector2(-14f, 0f), new Vector2(104f, 60f));
+            var badgeImage = badge.gameObject.AddComponent<Image>();
+            badgeImage.sprite = UiSprite();
+            badgeImage.type = Image.Type.Sliced;
+            badgeImage.color = new Color(0.42f, 0.34f, 0.72f);
+            badgeImage.raycastTarget = false;
+
+            RectTransform levelRect = UIChild("LevelLabel", badge);
+            Stretch(levelRect);
+            levelLabel = Label(levelRect.gameObject, 30f, TextAlignmentOptions.Center, Color.white);
+            levelLabel.fontStyle = FontStyles.Bold;
+            levelLabel.text = "LV 1";
+
+            killsLabel = KillBadge(hud);
+        }
+
+        /// <summary>Total kills, top-right, on its own pill so it reads at a glance
         /// against whatever is behind it.</summary>
         static TextMeshProUGUI KillBadge(Transform hud)
         {
             RectTransform badge = UIChild("KillBadge", hud);
-            Place(badge, new Vector2(0f, 1f), new Vector2(28f, -32f), new Vector2(150f, 62f));
+            Place(badge, new Vector2(1f, 1f), new Vector2(-22f, -20f), new Vector2(146f, 60f));
 
             var back = badge.gameObject.AddComponent<Image>();
             back.sprite = UiSprite();
@@ -408,10 +460,10 @@ namespace ScalePunch.EditorTools
             RectTransform textRect = UIChild("Count", badge);
             textRect.anchorMin = new Vector2(0f, 0f);
             textRect.anchorMax = new Vector2(1f, 1f);
-            textRect.offsetMin = new Vector2(54f, 0f);
+            textRect.offsetMin = new Vector2(52f, 0f);
             textRect.offsetMax = new Vector2(-10f, 0f);
 
-            TextMeshProUGUI text = Label(textRect.gameObject, 34f, TextAlignmentOptions.Left, Color.white);
+            TextMeshProUGUI text = Label(textRect.gameObject, 32f, TextAlignmentOptions.Left, Color.white);
             text.fontStyle = FontStyles.Bold;
             text.text = "0";
             return text;
@@ -449,31 +501,6 @@ namespace ScalePunch.EditorTools
             label = Label(labelRect.gameObject, 28f, TextAlignmentOptions.Center, Color.white);
             label.fontStyle = FontStyles.Bold;
             label.text = "100 / 100";
-        }
-
-        static void BuildLevelRow(RectTransform plate, out Image fill,
-                                  out TextMeshProUGUI levelLabel, out TextMeshProUGUI xpLabel)
-        {
-            RectTransform track = UIChild("LevelTrack", plate);
-            Place(track, new Vector2(0f, 1f), new Vector2(20f, -72f), new Vector2(526f, 34f));
-            var trackImage = track.gameObject.AddComponent<Image>();
-            trackImage.sprite = UiSprite();
-            trackImage.type = Image.Type.Sliced;
-            trackImage.color = new Color(0.07f, 0.06f, 0.11f, 0.95f);
-            trackImage.raycastTarget = false;
-
-            fill = BarFill(track, "Fill", new Color(0.42f, 0.62f, 1f));
-
-            RectTransform fractionRect = UIChild("XPLabel", track);
-            Stretch(fractionRect);
-            xpLabel = Label(fractionRect.gameObject, 22f, TextAlignmentOptions.Center, Color.white);
-            xpLabel.text = "0 / 5";
-
-            RectTransform levelRect = UIChild("LevelLabel", plate);
-            Place(levelRect, new Vector2(0f, 1f), new Vector2(20f, -112f), new Vector2(300f, 34f));
-            levelLabel = Label(levelRect.gameObject, 24f, TextAlignmentOptions.Left,
-                               new Color(0.78f, 0.80f, 0.88f));
-            levelLabel.text = "Level 1";
         }
 
         /// <summary>Four booster slots along the right of the bottom bar.</summary>
@@ -718,6 +745,7 @@ namespace ScalePunch.EditorTools
             var spawner = systems.AddComponent<EnemySpawner>();
             Set(spawner, "stage", data.stage);
             Set(spawner, "ramp", data.ramp);
+            Set(spawner, "levelSource", levels);
             Set(spawner, "secondsPerWave", 20f);
             Set(spawner, "target", player);
             Set(spawner, "spawnRadius", SpawnRadius);

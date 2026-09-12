@@ -95,13 +95,35 @@ Rounds also **reserve their damage** against the target while in flight, so the
 turret can see a kill coming and move on instead of emptying four rounds into a
 one-bullet Shambler.
 
+### One progression: "Level"
+
+There is a single number. It rises on kills, and it drives **both** the ability
+draft and the spawn ramp.
+
+Before, a "level" advanced on kills while a "wave" advanced on a 20-second
+clock. Two progressions, two names, two bars — and the player had no way to tell
+which one was making the game harder. They are the same thing now, shown once,
+on the top track.
+
+Driving difficulty from kills rather than the clock also makes the ramp
+**self-balancing**: a player clearing fast earns harder levels, and one who is
+struggling is not buried by a timer that does not care how they are doing.
+
+| Level | Reached at | What changes |
+|---|---|---|
+| 1-2 | 0 / 5 kills | Shamblers only |
+| 3 | 15 kills | Runners enter at 40% |
+| 6 | 105 kills | Brutes enter at 8% |
+| 10 | 275 kills | Runners 50%, Brutes 16% |
+| 15 | — | Spawn interval floors; burst takes over |
+
 ### The spawn ramp
 
-Endless difficulty comes from **composition and rate, never HP**. The bullet
-ladder is a fixed promise, so a harder wave means more zombies and tougher
-*kinds*, not the same zombie with more health.
+Difficulty comes from **composition and rate, never HP**. The bullet ladder is a
+fixed promise, so a harder level means more zombies and tougher *kinds*, not the
+same zombie with more health.
 
-| Wave | Interval | Burst | Spawns/min | Clear/min | Mix |
+| Level | Interval | Burst | Spawns/min | Clear/min | Mix |
 |---|---|---|---|---|---|
 | 1-2 | 1.40s | 1 | 43 | 180 | Shambler 100% |
 | 3 | 1.25s | 1 | 48 | 129 | Shambler 60%, **Runner 40%** |
@@ -112,17 +134,17 @@ ladder is a fixed promise, so a harder wave means more zombies and tougher
 | 25 | 0.35s | 3 | 514 | 65 | steady |
 
 *Clear/min* is what an **un-upgraded** player can kill, from fire rate against
-the mix's weighted bullets-per-kill. The crossover is **wave 10 (3:20)** — from
+the mix's weighted bullets-per-kill. The crossover is **level 10** — from
 there, upgrades have to cover the gap. That is the floor the draft has to beat,
 and the number to watch when tuning either side.
 
 Two rules the shape depends on:
 
-- **Waves 1-2 are Shamblers only.** A second tier means nothing until the player
+- **Levels 1-2 are Shamblers only.** A second tier means nothing until the player
   knows what one bullet does.
-- **Interval and burst never ramp at once.** Interval carries waves 1-15; burst
+- **Interval and burst never ramp at once.** Interval carries levels 1-15; burst
   only starts once it floors. A burst step is an integer, so overlapping them
-  roughly doubles the spawn rate in a single wave — a staircase that reads as the
+  roughly doubles the spawn rate in a single level — a staircase that reads as the
   game breaking rather than hardening. `SpawnRamp.OnValidate` warns if they
   overlap.
 
@@ -153,7 +175,7 @@ toggle on the list above changes the answer.
 | Ability draft, 8 abilities, 3 active effects | **BUILT** |
 | Draft rarity (5 tiers) + before/after card values | **BUILT** |
 | Kill-triggered drafts (5, 15, 30, …) | **BUILT** |
-| Run HUD: health bar with damage-delay + colour states, level bar with fraction, kill badge, timer, priority toggle | **BUILT** |
+| Run HUD: top level track (kill slider + level badge + total kills), bottom bar with health and boosters | **BUILT** |
 | Booster slots showing active abilities + cooldown sweep | **BUILT** |
 | Waves / stages | **BUILT** — 8 authored waves, ~3:30 |
 | Boss | **BUILT** — two phases, telegraphed charge |

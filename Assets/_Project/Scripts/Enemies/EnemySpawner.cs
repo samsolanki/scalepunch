@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using ScalePunch.Core;
+using ScalePunch.Progression;
 using ScalePunch.Stages;
 
 namespace ScalePunch.Enemies
@@ -26,6 +27,9 @@ namespace ScalePunch.Enemies
                  "shares, the spawn interval and the burst size, all per wave.")]
         [SerializeField] SpawnRamp ramp;
         [SerializeField] Transform target;
+        [Tooltip("Difficulty follows the player's level. Leave empty to fall back to " +
+                 "the clock via secondsPerWave.")]
+        [SerializeField] LevelSystem levelSource;
 
         [Header("Spawn ring")]
         [Tooltip("Distance from the player. Must exceed both the camera's visible " +
@@ -33,7 +37,8 @@ namespace ScalePunch.Enemies
         [SerializeField] float spawnRadius = 16f;
 
         [Header("Prototype (waves off)")]
-        [Tooltip("Seconds of run time per wave. The whole ramp is expressed in these.")]
+        [Tooltip("Fallback only, used when no LevelSystem is wired: seconds of run " +
+                 "time per level.")]
         [SerializeField] float secondsPerWave = 20f;
 
         [Header("Budget")]
@@ -203,8 +208,18 @@ namespace ScalePunch.Enemies
             }
         }
 
-        /// <summary>1-based wave number in endless mode.</summary>
-        int EndlessWave => Mathf.FloorToInt(_elapsed / Mathf.Max(1f, secondsPerWave)) + 1;
+        /// <summary>
+        /// The difficulty level. Driven by the player's level — which rises on
+        /// kills — rather than by elapsed time.
+        ///
+        /// Tying it to kills makes the ramp self-balancing: a player clearing fast
+        /// earns harder waves, and one who is struggling is not buried by a clock
+        /// that does not care how they are doing. It also collapses two competing
+        /// notions of progress into the single number the HUD shows.
+        /// </summary>
+        int EndlessWave => levelSource != null
+            ? levelSource.Level
+            : Mathf.FloorToInt(_elapsed / Mathf.Max(1f, secondsPerWave)) + 1;
 
         // ------------------------------------------------------------- waves
 
