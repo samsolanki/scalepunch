@@ -45,6 +45,36 @@ changing it needs a rebuild — the rest take effect on the next play.
 half the scene checks a toggle in its own `Awake` and Unity does not define the
 order those run in.
 
+### The bullet ladder
+
+Every zombie's HP is **derived from the player's base damage**, so tiers are
+authored as "dies in N bullets" rather than as raw HP:
+
+| Tier | HP | Bullets | Time to kill | Speed |
+|---|---|---|---|---|
+| Shambler | 5 | **1** | 0.33 s | 2.5 |
+| Runner | 10 | **2** | 0.67 s | 4.5 |
+| Brute | 30 | **6** | 2.00 s | 1.4 |
+| Boss | 200 | **40** | 13.3 s | 1.6 |
+
+At the base fire rate of 3/s, before any upgrades. `StatSheet.BaseDamage` is
+the single anchor — the builder reads it rather than keeping a copy, so
+changing damage moves every tier together instead of silently breaking the
+ladder.
+
+**Per-wave HP scaling is off** (`hpGrowthPerWave = 1`). With it on, a Shambler
+needed two bullets twenty seconds into every run, and nothing announced that the
+baseline had moved. Difficulty in the prototype comes from spawn rate alone.
+
+**Armour is 0 on everything with a countable bullet budget.** Armour and "dies
+in exactly N bullets" pull against each other: at armour 1 a 5-damage round
+lands 4, so a 30 HP Brute becomes eight shots rather than six. The Brute's
+identity is knockback immunity instead.
+
+The builder prints the ladder at wave 0 and wave 8 on every rebuild. If those
+two columns disagree, scaling is on and the ladder is a wave-0 promise the game
+stops keeping.
+
 ### What the prototype actually is
 
 Stationary player, auto-fire, zombies arriving forever on an accelerating timer.

@@ -19,13 +19,22 @@ namespace ScalePunch.Combat
             public float value;
         }
 
+        /// <summary>
+        /// The player's starting damage per round, and the anchor the whole
+        /// enemy HP ladder is derived from — a Shambler is "one bullet" because
+        /// its HP is exactly this. Changing it here changes every tier's
+        /// bullets-to-kill, so RunSceneBuilder reads this constant rather than
+        /// keeping its own copy.
+        /// </summary>
+        public const float BaseDamage = 5f;
+
         [SerializeField]
         BaseValue[] baseValues =
         {
             new() { stat = StatType.MaxHP,           value = 100f },
-            // 5 damage against a 5 HP Shambler is one bullet, one kill - the
-            // clearest possible read on whether the gun is working.
-            new() { stat = StatType.Damage,          value = 5f   },
+            // One bullet, one Shambler - the clearest possible read on whether
+            // the gun is working.
+            new() { stat = StatType.Damage,          value = BaseDamage },
             new() { stat = StatType.FireRate,        value = 3.0f },
             new() { stat = StatType.Range,           value = 9.0f },
             new() { stat = StatType.CritChance,      value = 0.05f },

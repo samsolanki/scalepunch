@@ -38,6 +38,14 @@ namespace ScalePunch.Enemies
                  "sustained fire trivially stunlocks them at the edge of the radius.")]
         [Range(0f, 1f)] public float knockbackResistance = 0f;
 
+        [Header("Scaling per wave")]
+        [Tooltip("HP multiplier compounded per wave. 1.0 disables scaling entirely, " +
+                 "which is what keeps a \"dies in exactly N bullets\" ladder true for " +
+                 "the whole run instead of only its first wave.")]
+        public float hpGrowthPerWave = 1.12f;
+        [Tooltip("Damage multiplier compounded per wave. 1.0 disables scaling.")]
+        public float damageGrowthPerWave = 1.08f;
+
         [Header("Rewards")]
         public int xpValue = 1;
 
@@ -45,12 +53,24 @@ namespace ScalePunch.Enemies
         public Color tint = Color.white;
         public float scale = 1f;
 
-        /// <summary>hp(wave) = baseHP * 1.12^wave * stageMultiplier — docs/01 §5.</summary>
+        /// <summary>hp(wave) = baseHP * hpGrowth^wave * stageMultiplier — docs/01 §5.</summary>
         public float HPAtWave(int wave, float stageMultiplier = 1f)
-            => baseHP * Mathf.Pow(1.12f, wave) * stageMultiplier;
+            => baseHP * Mathf.Pow(Mathf.Max(0.01f, hpGrowthPerWave), wave) * stageMultiplier;
 
-        /// <summary>damage(wave) = baseDamage * 1.08^wave * stageMultiplier.</summary>
+        /// <summary>damage(wave) = baseDamage * damageGrowth^wave * stageMultiplier.</summary>
         public float DamageAtWave(int wave, float stageMultiplier = 1f)
-            => baseDamage * Mathf.Pow(1.08f, wave) * stageMultiplier;
+            => baseDamage * Mathf.Pow(Mathf.Max(0.01f, damageGrowthPerWave), wave) * stageMultiplier;
+
+        /// <summary>
+        /// How many un-crit rounds of <paramref name="bulletDamage"/> this takes
+        /// to kill at a given wave. Used by the builder to log the ladder, so a
+        /// balance change that breaks "one bullet" is visible immediately rather
+        /// than twenty seconds into a playtest.
+        /// </summary>
+        public int BulletsToKill(float bulletDamage, int wave = 0, float stageMultiplier = 1f)
+        {
+            float perHit = Mathf.Max(1f, bulletDamage - armor);
+            return Mathf.CeilToInt(HPAtWave(wave, stageMultiplier) / perHit);
+        }
     }
 }

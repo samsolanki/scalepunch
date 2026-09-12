@@ -138,6 +138,8 @@ namespace ScalePunch.EditorTools
             // against the pre-reload assembly if it is clicked while a compile is
             // finishing, and the only symptom is stale data with a clean log.
             // This line makes which code ran unambiguous.
+            LogBulletLadder(set);
+
             Debug.Log($"[ScalePunch] Data written: shambler {set.zombies[0].baseHP} HP, " +
                       $"runner {set.zombies[1].baseHP} HP, " +
                       $"brute {set.zombies[2].baseHP} HP / armour {set.zombies[2].armor}, " +
@@ -196,9 +198,20 @@ namespace ScalePunch.EditorTools
             set.zombies = zombies;
         }
 
+        /// <summary>
+        /// The player's base Damage, read from StatSheet rather than copied.
+        /// Every zombie's HP derives from it, so "two bullets" stays two bullets
+        /// when the damage number changes instead of quietly becoming three.
+        /// </summary>
+        const float BaseBulletDamage = StatSheet.BaseDamage;
+
+        /// <summary>HP for a zombie that should die in exactly N un-crit rounds.</summary>
+        static float Bullets(int count) => BaseBulletDamage * count;
+
         static EnemyDefinition Zombie(string file, string id, float hp, float damage,
                                       float speed, float knockbackResist, int xp,
-                                      float scale, EnemyBehaviour behaviour, float armor = 0f)
+                                      float scale, EnemyBehaviour behaviour, float armor = 0f,
+                                      float hpGrowth = 1f, float damageGrowth = 1f)
         {
             EnemyDefinition def = Asset<EnemyDefinition>(file);
 
@@ -214,8 +227,34 @@ namespace ScalePunch.EditorTools
             def.xpValue = xp;
             def.scale = scale;
 
+            // Growth defaults to 1 (off). A bullet ladder that only holds for the
+            // first twenty seconds is worse than no ladder, because nothing tells
+            // the player — or you — the moment it stops being true.
+            def.hpGrowthPerWave = hpGrowth;
+            def.damageGrowthPerWave = damageGrowth;
+
             EditorUtility.SetDirty(def);
             return def;
+        }
+
+        /// <summary>
+        /// Prints the bullets-to-kill ladder at wave 0 and wave 8. If the two
+        /// columns disagree, HP scaling is on and the ladder is a wave-0 promise
+        /// the game stops keeping — which is exactly the failure this exists to
+        /// surface.
+        /// </summary>
+        static void LogBulletLadder(DataSet set)
+        {
+            var sb = new System.Text.StringBuilder("[ScalePunch] Bullets to kill @ ");
+            sb.Append(BaseBulletDamage).Append(" damage  (wave 0 -> wave 8)\n");
+
+            foreach (EnemyDefinition def in set.zombies)
+                sb.Append($"  {def.id,-10} {def.BulletsToKill(BaseBulletDamage),3}  ->{def.BulletsToKill(BaseBulletDamage, 8),3}\n");
+
+            if (set.boss != null)
+                sb.Append($"  {set.boss.id,-10} {set.boss.BulletsToKill(BaseBulletDamage),3}  ->{set.boss.BulletsToKill(BaseBulletDamage, 8),3}");
+
+            Debug.Log(sb.ToString());
         }
 
         static EnemyDefinition[] BuildZombies()
@@ -225,11 +264,17 @@ namespace ScalePunch.EditorTools
                 // 5 HP against 5 damage: exactly one bullet per Shambler at
                 // wave 0. That one-shot read is the whole point of the basic
                 // zombie - it is how the player learns the gun works.
-                Zombie("Zombie_Shambler", "shambler",  5f,  8f, 2.5f, 0f, 1, 1.00f, EnemyBehaviour.Shambler),
+                // ONE bullet. The baseline the whole game is read against: if a
+                // Shambler ever needs two, every tier above it has silently moved.
+                Zombie("Zombie_Shambler", "shambler", Bullets(1), 8f, 2.5f, 0f, 1, 1.00f,
+                       EnemyBehaviour.Shambler),
                 // Medium tier: two bullets. Fast enough to cross the ring in the
                 // time those two shots take, which is what makes fire rate the
                 // stat that answers it.
-                Zombie("Zombie_Runner",   "runner",   10f,  6f, 4.5f, 0f, 2, 0.85f, EnemyBehaviour.Runner),
+                // TWO bullets, but nearly twice the speed. Fragile and quick —
+                // it punishes low fire rate, not low damage.
+                Zombie("Zombie_Runner", "runner", Bullets(2), 6f, 4.5f, 0f, 2, 0.85f,
+                       EnemyBehaviour.Runner),
 
                 // Brutes are knockback-immune. Without that, sustained fire
                 // stunlocks them at the edge of the ring and they stop being a
@@ -243,7 +288,15 @@ namespace ScalePunch.EditorTools
                 // with armour 1 a 5 damage round only lands 4, so 10 HP would take
                 // three shots, not two. Anything that must die in a countable
                 // number of hits has to have no armour at all.
-                Zombie("Zombie_Brute",    "brute",    10f, 18f, 1.4f, 1f, 4, 1.45f, EnemyBehaviour.Brute, armor: 0f)
+                // SIX bullets and knockback-immune. This is the damage check —
+                // the tier that makes Heavy Rounds worth drafting.
+                //
+                // Armour stays at 0 deliberately. Armour and "dies in exactly N
+                // bullets" pull against each other: at armour 1 a 5-damage round
+                // lands 4, so 30 HP becomes eight shots rather than six. Anything
+                // with a countable bullet budget cannot also carry armour.
+                Zombie("Zombie_Brute", "brute", Bullets(6), 18f, 1.4f, 1f, 4, 1.45f,
+                       EnemyBehaviour.Brute, armor: 0f)
             };
         }
 
@@ -255,7 +308,11 @@ namespace ScalePunch.EditorTools
             // its charge, and a fight long enough to be boring is worse than one
             // that ends while the telegraph is still exciting. 180 HP against a
             // levelled-up build is roughly 25-40 seconds.
-            EnemyDefinition def = Zombie("Zombie_Boss", "boss", 180f, 22f, 1.6f,
+            // FORTY bullets — about 13 seconds of unbroken fire at the base rate,
+            // less once the run has upgrades in it. Long enough to be a fight,
+            // short enough that the charge telegraph is still exciting the last
+            // time it plays.
+            EnemyDefinition def = Zombie("Zombie_Boss", "boss", Bullets(40), 22f, 1.6f,
                                         knockbackResist: 1f, xp: 40, scale: 2.2f,
                                         behaviour: EnemyBehaviour.Brute, armor: 0f);
 
