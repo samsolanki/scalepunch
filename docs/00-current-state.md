@@ -91,9 +91,22 @@ will be; the firing arc is the target's **angular size** (3.5° at 9 m, 15° at
 2 m) rather than a constant; and it holds fire entirely when the intercept falls
 outside the ring.
 
-Rounds also **reserve their damage** against the target while in flight, so the
-turret can see a kill coming and move on instead of emptying four rounds into a
-one-bullet Shambler.
+Rounds **reserve their damage** against the target while in flight. That
+reservation is a **preference, not an exclusion**:
+
+- The current target is never dropped for being doomed — the engagement finishes.
+- Target selection prefers a non-doomed zombie but falls back to a doomed one
+  rather than returning nothing.
+
+Both rules exist because the strict version broke exactly one tier. A Shambler
+has 5 HP and a round carries 5 damage, so a single round in the air marked it
+dead-on-arrival, the turret stopped tracking it, and if that round then missed
+the Shambler walked in unengaged until it expired. Nothing above 5 HP could
+reproduce it, which is why it looked like a level-1 problem.
+
+It also bought nothing: at a 0.33 s fire interval against a 0.20 s flight time,
+only one round is ever airborne, so overkill was not possible in the first place.
+The reservation stays for when fire rate climbs past flight time.
 
 ### One progression: "Level"
 

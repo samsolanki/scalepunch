@@ -131,10 +131,15 @@ namespace ScalePunch.Player
         {
             float range = Range;
 
-            // Keep the current target while it is alive, not already dead on
-            // arrival, and still roughly in range. The stickiness margin stops the
-            // turret oscillating between two zombies at nearly identical distance.
-            if (CurrentTarget != null && !CurrentTarget.IsDead && !IsDoomed(CurrentTarget))
+            // Keep the current target while it is alive and in range.
+            //
+            // Deliberately NOT dropped for being doomed. Doing that broke exactly
+            // one tier: a Shambler has 5 HP and a round carries 5 damage, so a
+            // single round in the air marked it dead-on-arrival and the turret
+            // stopped tracking it. If that round then missed — separation jitter,
+            // knockback, a slightly stale lead — the Shambler walked in unengaged
+            // until the round expired. Nothing above 5 HP could reproduce it.
+            if (CurrentTarget != null && !CurrentTarget.IsDead)
             {
                 float distSqr = (CurrentTarget.transform.position - transform.position).sqrMagnitude;
                 if (distSqr <= range * range * targetStickiness) return;
@@ -146,10 +151,24 @@ namespace ScalePunch.Player
         bool IsDoomed(Enemy enemy) => avoidOverkill && enemy.IsDoomed;
 
         /// <summary>
-        /// One filtered scan for every priority, so the doomed-target filter
-        /// cannot apply to three of the four modes and silently not the fourth.
+        /// Prefers a target that is not already dead on arrival, but falls back to
+        /// one that is rather than returning nothing.
+        ///
+        /// Doomed is a preference, not an exclusion. As a hard filter it could
+        /// leave the turret idle with live zombies inside the ring — which is a
+        /// far worse failure than the wasted round it was trying to save.
         /// </summary>
         Enemy SelectTarget(float range)
+        {
+            Enemy preferred = Scan(range, skipDoomed: true);
+            return preferred != null ? preferred : Scan(range, skipDoomed: false);
+        }
+
+        /// <summary>
+        /// One scan shared by every priority, so the filter cannot apply to three
+        /// of the four modes and silently not the fourth.
+        /// </summary>
+        Enemy Scan(float range, bool skipDoomed)
         {
             var all = EnemyRegistry.All;
             float rangeSqr = range * range;
@@ -160,7 +179,7 @@ namespace ScalePunch.Player
             {
                 Enemy e = all[i];
                 if (e == null || e.IsDead) continue;
-                if (IsDoomed(e)) continue;
+                if (skipDoomed && IsDoomed(e)) continue;
 
                 float distSqr = (e.transform.position - transform.position).sqrMagnitude;
                 if (distSqr > rangeSqr) continue;
@@ -228,7 +247,16 @@ namespace ScalePunch.Player
             // cannot be right at both.
             float hitRadius = weapon != null ? weapon.hitRadius : 0.5f;
             float angularSize = Mathf.Atan2(hitRadius, Mathf.Max(0.01f, distance)) * Mathf.Rad2Deg;
-            float allowed = Mathf.Clamp(angularSize, minFiringArc, maxFiringArc);
+
+            // Plus part of what the round can steer out during its flight. Demanding
+            // a perfect alignment the round does not need costs firing time for
+            // nothing; taking only half the budget leaves the rest as margin for
+            // the target changing direction mid-flight.
+            float steerBudget = weapon != null && speed > 0.01f
+                ? weapon.steerDegreesPerSecond * (distance / speed) * 0.5f
+                : 0f;
+
+            float allowed = Mathf.Clamp(angularSize + steerBudget, minFiringArc, maxFiringArc);
 
             return Quaternion.Angle(turret.rotation, desired) <= allowed;
         }
