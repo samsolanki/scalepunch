@@ -30,6 +30,7 @@ namespace ScalePunch.EditorTools
             public EnemyDefinition boss;
             public WaveDefinition[] waves;
             public StageDefinition stage;
+            public SpawnRamp ramp;
             public AbilityLibrary library;
             public PrototypeConfig prototype;
         }
@@ -135,6 +136,7 @@ namespace ScalePunch.EditorTools
             set.boss = BuildBoss();
             set.waves = BuildWaves(set.zombies, set.boss);
             set.stage = BuildStage(set.waves, set.boss);
+            set.ramp = BuildSpawnRamp(set.zombies);
             set.library = BuildAbilities(set.prototype);
 
             // Echo the values actually written. Unity can run a queued menu item
@@ -142,6 +144,7 @@ namespace ScalePunch.EditorTools
             // finishing, and the only symptom is stale data with a clean log.
             // This line makes which code ran unambiguous.
             LogBulletLadder(set);
+            LogSpawnRamp(set);
 
             Debug.Log($"[ScalePunch] Data written: shambler {set.zombies[0].baseHP} HP, " +
                       $"runner {set.zombies[1].baseHP} HP, " +
@@ -154,6 +157,7 @@ namespace ScalePunch.EditorTools
                       $"stage '{set.stage.id}' {set.stage.WaveCount} waves / " +
                       $"{set.stage.TotalWaveSeconds():0}s + boss {set.boss.baseHP} HP");
 
+            EditorUtility.SetDirty(set.ramp);
             EditorUtility.SetDirty(set.prototype);
             EditorUtility.SetDirty(set.stage);
             EditorUtility.SetDirty(set.boss);
@@ -177,6 +181,7 @@ namespace ScalePunch.EditorTools
             set.prototype = Keep(LoadData<PrototypeConfig>("PrototypeConfig"), set.prototype);
             set.boss = Keep(LoadData<EnemyDefinition>("Zombie_Boss"), set.boss);
             set.stage = Keep(LoadData<StageDefinition>("Stage_01"), set.stage);
+            set.ramp = Keep(LoadData<SpawnRamp>("SpawnRamp"), set.ramp);
 
             if (set.waves != null)
                 for (int i = 0; i < set.waves.Length; i++)
@@ -409,6 +414,138 @@ namespace ScalePunch.EditorTools
                      Entry(brute, 14f, 4, SpawnPattern.Ring, 6f),
                      Entry(runner, 24f, 10, SpawnPattern.Arc, 4f, 90f))
             };
+        }
+
+        /// <summary>
+        /// The endless difficulty ramp.
+        ///
+        /// Waves 1-2 are Shamblers only: the player has to learn what one bullet
+        /// does before a second tier means anything. Runners arrive at wave 3
+        /// taking 40% of spawns; Brutes at wave 6. The Shambler absorbs the rest
+        /// and never drops below 20%, because it is the tier every other tier is
+        /// read against.
+        ///
+        /// Difficulty rises through composition and rate only — never HP. The
+        /// bullet ladder is a promise the game has to keep.
+        /// </summary>
+        static SpawnRamp BuildSpawnRamp(EnemyDefinition[] zombies)
+        {
+            SpawnRamp ramp = Asset<SpawnRamp>("SpawnRamp");
+
+            ramp.tiers = new[]
+            {
+                new SpawnRamp.TierRamp
+                {
+                    enemy = zombies[0],          // Shambler
+                    isBaseline = true,
+                    firstWave = 1
+                },
+                new SpawnRamp.TierRamp
+                {
+                    enemy = zombies[1],          // Runner
+                    firstWave = 3,
+                    rampEndWave = 10,
+                    shareAtFirstWave = 0.40f,
+                    shareAtRampEnd = 0.50f
+                },
+                new SpawnRamp.TierRamp
+                {
+                    enemy = zombies[2],          // Brute
+                    firstWave = 6,
+                    rampEndWave = 15,
+                    shareAtFirstWave = 0.08f,
+                    shareAtRampEnd = 0.25f
+                }
+            };
+
+            ramp.baselineMinimumShare = 0.20f;
+
+            // Interval carries the early ramp; once it floors out at wave 15 the
+            // burst size takes over, so pressure keeps rising without the spawn
+            // loop firing every other frame.
+            ramp.intervalAtWave1 = 1.40f;
+            ramp.intervalAtRampEnd = 0.35f;
+            ramp.intervalRampEndWave = 15;
+            ramp.minimumInterval = 0.25f;
+
+            // Burst only starts once the interval has bottomed out. Ramping both
+            // at once makes a staircase: a single burst step doubles the spawn
+            // rate in one wave, which reads as the game breaking, not hardening.
+            ramp.burstStartWave = 15;
+            ramp.burstAtStart = 1;
+            ramp.burstAtRampEnd = 3;
+            ramp.burstRampEndWave = 25;
+
+            EditorUtility.SetDirty(ramp);
+            return ramp;
+        }
+
+        /// <summary>
+        /// The ramp, and the wave at which it outpaces an un-upgraded player.
+        ///
+        /// Spawn rate on its own says nothing — what matters is spawn rate
+        /// against the rate the gun can clear, and that depends on the *mix*,
+        /// since a Brute costs six rounds and a Shambler one. The overrun wave is
+        /// where a player who drafted nothing starts losing ground, which is the
+        /// floor the upgrade curve has to beat.
+        /// </summary>
+        static void LogSpawnRamp(DataSet set)
+        {
+            const float BaseFireRate = 3f;              // StatSheet FireRate
+            float roundsPerMinute = BaseFireRate * 60f;
+
+            var sb = new System.Text.StringBuilder("[ScalePunch] Spawn ramp\n");
+            sb.Append("  wave  interval  burst  spawn/min  clear/min  mix\n");
+
+            int overrunWave = 0;
+
+            foreach (int wave in new[] { 1, 2, 3, 5, 6, 10, 15, 20, 25 })
+            {
+                float interval = set.ramp.IntervalFor(wave);
+                int burst = set.ramp.BurstFor(wave);
+                float spawnsPerMinute = 60f / interval * burst;
+
+                float roundsPerKill = AverageBulletsPerKill(set, wave);
+                float clearsPerMinute = roundsPerKill <= 0f ? 0f : roundsPerMinute / roundsPerKill;
+
+                if (overrunWave == 0 && spawnsPerMinute > clearsPerMinute) overrunWave = wave;
+
+                sb.Append($"  {wave,4}  {interval,7:0.00}s {burst,5}  {spawnsPerMinute,9:0}  " +
+                          $"{clearsPerMinute,9:0}  {set.ramp.Describe(wave)}\n");
+            }
+
+            sb.Append(overrunWave > 0
+                ? $"  -> an un-upgraded player falls behind at wave {overrunWave}. " +
+                  "Upgrades have to cover the gap from there."
+                : "  -> the base loadout keeps up at every sampled wave; the ramp may be too soft.");
+
+            Debug.Log(sb.ToString());
+        }
+
+        /// <summary>Rounds per kill across the wave's mix, weighted by share.</summary>
+        static float AverageBulletsPerKill(DataSet set, int wave)
+        {
+            float claimed = 0f;
+            foreach (SpawnRamp.TierRamp tier in set.ramp.tiers)
+                if (tier != null && !tier.isBaseline) claimed += tier.ShareAt(wave);
+
+            float weighted = 0f;
+            float total = 0f;
+
+            foreach (SpawnRamp.TierRamp tier in set.ramp.tiers)
+            {
+                if (tier == null || tier.enemy == null) continue;
+
+                float share = tier.isBaseline
+                    ? Mathf.Max(set.ramp.baselineMinimumShare, 1f - claimed)
+                    : tier.ShareAt(wave);
+
+                if (share <= 0f) continue;
+
+                weighted += share * tier.enemy.BulletsToKill(BaseBulletDamage);
+                total += share;
+            }
+            return total <= 0f ? 1f : weighted / total;
         }
 
         static StageDefinition BuildStage(WaveDefinition[] waves, EnemyDefinition boss)

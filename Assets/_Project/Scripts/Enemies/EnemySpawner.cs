@@ -22,6 +22,9 @@ namespace ScalePunch.Enemies
 
         [Header("References")]
         [SerializeField] StageDefinition stage;
+        [Tooltip("Drives the endless prototype: which tiers are in the mix, their " +
+                 "shares, the spawn interval and the burst size, all per wave.")]
+        [SerializeField] SpawnRamp ramp;
         [SerializeField] Transform target;
 
         [Header("Spawn ring")]
@@ -30,12 +33,8 @@ namespace ScalePunch.Enemies
         [SerializeField] float spawnRadius = 16f;
 
         [Header("Prototype (waves off)")]
-        [Tooltip("Seconds between spawns at the start of an endless run.")]
-        [SerializeField] float initialInterval = 1.4f;
-        [SerializeField] float minimumInterval = 0.25f;
-        [Tooltip("Seconds of run time per difficulty step, used for HP scaling and " +
-                 "to halve the spawn interval every three steps.")]
-        [SerializeField] float secondsPerStep = 20f;
+        [Tooltip("Seconds of run time per wave. The whole ramp is expressed in these.")]
+        [SerializeField] float secondsPerWave = 20f;
 
         [Header("Budget")]
         [Tooltip("Hard cap. 150 is the mobile budget from docs/02-tech-stack.md §5.")]
@@ -56,6 +55,7 @@ namespace ScalePunch.Enemies
         int _cursor;
         float _waveElapsed;
         float _phaseTimer;
+        int _lastAnnouncedWave;
         Enemy _boss;
 
         /// <summary>Wave index (0-based) and total, as each wave begins.</summary>
@@ -66,8 +66,8 @@ namespace ScalePunch.Enemies
         public event Action StageCleared;
 
         public StageDefinition Stage => stage;
-        /// <summary>1-based, for display. 0 before the first wave starts.</summary>
-        public int CurrentWaveNumber => _waveIndex + 1;
+        /// <summary>1-based, for display. In endless mode it counts up forever.</summary>
+        public int CurrentWaveNumber => _useWaves ? _waveIndex + 1 : EndlessWave;
         public int TotalWaves => stage != null ? stage.WaveCount : 0;
         public bool IsBossActive => _phase == Phase.Boss && _boss != null && !_boss.IsDead;
 
@@ -94,7 +94,7 @@ namespace ScalePunch.Enemies
                 return;
             }
 
-            foreach (EnemyDefinition def in stage.AllEnemies())
+            foreach (EnemyDefinition def in PooledEnemies())
             {
                 // Skip the boss prefab's pool entirely when bosses are off, rather
                 // than pre-warming a 2.2x-scale prefab that will never spawn.
@@ -112,6 +112,25 @@ namespace ScalePunch.Enemies
                 int prewarm = def == stage.boss ? 1 : prewarmPerType;
                 _pools[def] = new Pool<Enemy>(def.prefab, _poolRoot, prewarm);
             }
+        }
+
+        /// <summary>
+        /// Every definition that might spawn, from whichever source is driving
+        /// this run. Pooling only what the stage lists would leave the endless
+        /// ramp's tiers to Instantiate mid-run, which is the one thing the pool
+        /// exists to prevent.
+        /// </summary>
+        IEnumerable<EnemyDefinition> PooledEnemies()
+        {
+            var seen = new HashSet<EnemyDefinition>();
+
+            foreach (EnemyDefinition def in stage.AllEnemies())
+                if (def != null && seen.Add(def)) yield return def;
+
+            if (ramp == null) yield break;
+
+            foreach (EnemyDefinition def in ramp.AllEnemies())
+                if (def != null && seen.Add(def)) yield return def;
         }
 
         void OnDestroy() => EnemyRegistry.Clear();
@@ -143,42 +162,49 @@ namespace ScalePunch.Enemies
         }
 
         /// <summary>
-        /// Prototype spawning: one zombie at a time on an accelerating timer,
-        /// forever. No structure, no end — just enough pressure to answer whether
-        /// holding the ring is fun.
+        /// Prototype spawning, driven entirely by the SpawnRamp: the mix, the
+        /// interval and the burst size all come from the wave number.
         /// </summary>
         void TickEndless(float dt)
         {
             _endlessTimer -= dt;
             if (_endlessTimer > 0f) return;
 
-            // Halves roughly every three steps, floored so it stays playable.
-            float t = _elapsed / (secondsPerStep * 3f);
-            _endlessTimer = Mathf.Max(minimumInterval, initialInterval * Mathf.Pow(0.5f, t));
+            int wave = EndlessWave;
 
-            if (EnemyRegistry.Count >= maxConcurrent) return;
-
-            EnemyDefinition def = RandomOrdinaryZombie();
-            if (def != null) Spawn(def, UnityEngine.Random.value * 360f, waveOverride: EndlessStep);
-        }
-
-        int EndlessStep => Mathf.FloorToInt(_elapsed / secondsPerStep);
-
-        EnemyDefinition RandomOrdinaryZombie()
-        {
-            // Straight off the pool keys, so it can only ever pick something that
-            // was actually pre-warmed — the boss is not among them when bosses
-            // are off.
-            int count = _pools.Count;
-            if (count == 0) return null;
-
-            int index = UnityEngine.Random.Range(0, count);
-            foreach (EnemyDefinition def in _pools.Keys)
+            if (wave != _lastAnnouncedWave)
             {
-                if (index-- == 0) return def == stage.boss ? null : def;
+                _lastAnnouncedWave = wave;
+                WaveStarted?.Invoke(wave - 1, 0);
             }
-            return null;
+
+            if (ramp == null)
+            {
+                _endlessTimer = 1f;
+                return;
+            }
+
+            _endlessTimer = ramp.IntervalFor(wave);
+
+            // A burst arrives together, from angles spread around the ring rather
+            // than one point — the pressure should come from everywhere, which is
+            // the whole premise of a fixed emplacement.
+            int burst = ramp.BurstFor(wave);
+            float baseAngle = UnityEngine.Random.value * 360f;
+
+            for (int i = 0; i < burst; i++)
+            {
+                if (EnemyRegistry.Count >= maxConcurrent) break;
+
+                EnemyDefinition def = ramp.Pick(wave);
+                if (def == null) break;
+
+                Spawn(def, baseAngle + 360f * i / burst, waveOverride: 0);
+            }
         }
+
+        /// <summary>1-based wave number in endless mode.</summary>
+        int EndlessWave => Mathf.FloorToInt(_elapsed / Mathf.Max(1f, secondsPerWave)) + 1;
 
         // ------------------------------------------------------------- waves
 

@@ -717,13 +717,12 @@ namespace ScalePunch.EditorTools
             // reward numbers all come off the StageDefinition asset.
             var spawner = systems.AddComponent<EnemySpawner>();
             Set(spawner, "stage", data.stage);
+            Set(spawner, "ramp", data.ramp);
+            Set(spawner, "secondsPerWave", 20f);
             Set(spawner, "target", player);
             Set(spawner, "spawnRadius", SpawnRadius);
             Set(spawner, "maxConcurrent", 150);
             Set(spawner, "prewarmPerType", 24);
-            Set(spawner, "initialInterval", 1.4f);
-            Set(spawner, "minimumInterval", 0.25f);
-            Set(spawner, "secondsPerStep", 20f);
 
             var gems = systems.AddComponent<XPGemService>();
             Set(gems, "prefab", prefabs.gem);

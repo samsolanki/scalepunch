@@ -95,6 +95,39 @@ Rounds also **reserve their damage** against the target while in flight, so the
 turret can see a kill coming and move on instead of emptying four rounds into a
 one-bullet Shambler.
 
+### The spawn ramp
+
+Endless difficulty comes from **composition and rate, never HP**. The bullet
+ladder is a fixed promise, so a harder wave means more zombies and tougher
+*kinds*, not the same zombie with more health.
+
+| Wave | Interval | Burst | Spawns/min | Clear/min | Mix |
+|---|---|---|---|---|---|
+| 1-2 | 1.40s | 1 | 43 | 180 | Shambler 100% |
+| 3 | 1.25s | 1 | 48 | 129 | Shambler 60%, **Runner 40%** |
+| 6 | 1.02s | 1 | 59 | 98 | Shambler 48%, Runner 44%, **Brute 8%** |
+| 10 | 0.72s | 1 | 83 | 79 | Shambler 34%, Runner 50%, Brute 16% |
+| 15 | 0.35s | 1 | 171 | 65 | Shambler 25%, Runner 50%, Brute 25% |
+| 20 | 0.35s | 2 | 343 | 65 | steady |
+| 25 | 0.35s | 3 | 514 | 65 | steady |
+
+*Clear/min* is what an **un-upgraded** player can kill, from fire rate against
+the mix's weighted bullets-per-kill. The crossover is **wave 10 (3:20)** — from
+there, upgrades have to cover the gap. That is the floor the draft has to beat,
+and the number to watch when tuning either side.
+
+Two rules the shape depends on:
+
+- **Waves 1-2 are Shamblers only.** A second tier means nothing until the player
+  knows what one bullet does.
+- **Interval and burst never ramp at once.** Interval carries waves 1-15; burst
+  only starts once it floors. A burst step is an integer, so overlapping them
+  roughly doubles the spawn rate in a single wave — a staircase that reads as the
+  game breaking rather than hardening. `SpawnRamp.OnValidate` warns if they
+  overlap.
+
+Authored in `SpawnRamp.asset`; the builder prints the whole table on rebuild.
+
 ### What the prototype actually is
 
 Stationary player, auto-fire, zombies arriving forever on an accelerating timer.
