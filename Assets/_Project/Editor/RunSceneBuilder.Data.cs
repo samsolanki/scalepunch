@@ -247,6 +247,11 @@ namespace ScalePunch.EditorTools
             def.xpValue = xp;
             def.scale = scale;
 
+            // Clear daylight between the bodies. 0.15 was geometrically correct
+            // and visually invisible — two capsules 0.15 m apart still read as
+            // touching at this camera height.
+            def.standoffGap = 0.6f;
+
             // Growth defaults to 1 (off). A bullet ladder that only holds for the
             // first twenty seconds is worse than no ladder, because nothing tells
             // the player — or you — the moment it stops being true.

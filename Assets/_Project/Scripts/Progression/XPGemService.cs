@@ -35,6 +35,15 @@ namespace ScalePunch.Progression
         {
             base.Awake();
 
+            // Kills drive progress, so a gem would grant nothing. Switch the whole
+            // service off rather than relying on a guard inside Drop: no pool, no
+            // per-frame magnet pass, and no path by which a pickup can appear.
+            if (levelSystem != null && levelSystem.Source != ProgressSource.XPGems)
+            {
+                enabled = false;
+                return;
+            }
+
             _root = new GameObject("~XPGemPool").transform;
             _root.SetParent(transform, false);
 
