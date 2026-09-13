@@ -42,13 +42,17 @@ namespace ScalePunch.Player
 
         [Header("Targeting")]
         [SerializeField] TargetPriority priority = TargetPriority.Closest;
-        [Tooltip("Degrees per second the turret slews. The gun does not fire until it is on target.")]
-        [SerializeField] float turnSpeed = 720f;
-        [Tooltip("Floor on the firing arc. Without one, a distant target's angular " +
-                 "size shrinks below the turret's ability to settle and it never fires.")]
-        [Range(0.25f, 10f)] [SerializeField] float minFiringArc = 1.5f;
-        [Tooltip("Ceiling on the firing arc, for targets close enough to be huge on screen.")]
-        [Range(5f, 90f)] [SerializeField] float maxFiringArc = 25f;
+        [Tooltip("Degrees per second the turret slews. Must exceed the fastest line-of-sight " +
+                 "rate inside the ring, or the turret can never finish its turn and so never " +
+                 "fires. A Runner at 4.5 m/s passing 0.35 m away swings the line at about " +
+                 "740 deg/s, so this has real margin over the worst case.")]
+        [SerializeField] float turnSpeed = 1440f;
+        [Tooltip("Float-comparison noise only — NOT a design tolerance.\n\n" +
+                 "Quaternion.RotateTowards clamps rather than overshoots, so the turret lands " +
+                 "exactly on its target rotation. This exists solely because comparing two " +
+                 "quaternions for equality in floating point needs a hair of slack; it is not " +
+                 "permission to fire while pointing off-target.")]
+        [Range(0.001f, 0.2f)] [SerializeField] float aimEpsilon = 0.01f;
         [Tooltip("Cap on predicted lead time, in seconds. A target whose intercept is " +
                  "further out than this is not worth leading — it will have changed " +
                  "direction by then.")]
@@ -95,6 +99,13 @@ namespace ScalePunch.Player
         public float Range => weapon != null ? weapon.RangeFor(stats.Stats) : stats.Get(StatType.Range);
         /// <summary>0-1 progress toward the next shot, for UI.</summary>
         public float ReloadProgress { get; private set; }
+
+        /// <summary>Degrees between where the turret points and where it should.
+        /// Zero whenever it has finished its turn. Exposed for diagnostics.</summary>
+        public float AimError { get; private set; }
+
+        /// <summary>True only when the turret is exactly on target.</summary>
+        public bool IsOnTarget { get; private set; }
 
         void Reset()
         {
@@ -248,31 +259,31 @@ namespace ScalePunch.Player
             if (toAim.sqrMagnitude < 0.0001f) return false;
 
             Quaternion desired = Quaternion.LookRotation(toAim.normalized, Vector3.up);
+
+            // RotateTowards clamps to the destination — it never overshoots — so
+            // when the remaining angle fits inside one frame's travel the turret
+            // lands on `desired` exactly. 62 degrees of turn ends at 62, not 61.7
+            // and not 62.4.
             turret.rotation = Quaternion.RotateTowards(
                 turret.rotation, desired, turnSpeed * Time.deltaTime);
 
-            // A round cannot be fired past the edge of the ring, so an intercept
-            // beyond it is a guaranteed miss. Hold fire and keep tracking.
+            AimError = Quaternion.Angle(turret.rotation, desired);
+            IsOnTarget = AimError <= aimEpsilon;
+
+            // Out of range: no shot exists that could reach, so hold fire and
+            // keep tracking.
             float distance = toAim.magnitude;
             if (distance > range) return false;
 
-            // The arc is the target's angular size, not a fixed number: half a
-            // metre of body is 3.5 degrees at 9 m and 15 at 2 m, and one constant
-            // cannot be right at both.
-            float hitRadius = weapon != null ? weapon.hitRadius : 0.5f;
-            float angularSize = Mathf.Atan2(hitRadius, Mathf.Max(0.01f, distance)) * Mathf.Rad2Deg;
-
-            // Plus part of what the round can steer out during its flight. Demanding
-            // a perfect alignment the round does not need costs firing time for
-            // nothing; taking only half the budget leaves the rest as margin for
-            // the target changing direction mid-flight.
-            float steerBudget = weapon != null && speed > 0.01f
-                ? weapon.steerDegreesPerSecond * (distance / speed) * 0.5f
-                : 0f;
-
-            float allowed = Mathf.Clamp(angularSize + steerBudget, minFiringArc, maxFiringArc);
-
-            return Quaternion.Angle(turret.rotation, desired) <= allowed;
+            // Exactly on target, or not firing.
+            //
+            // This used to permit the target's angular size PLUS half of what the
+            // round could steer out in flight — about 7 degrees at 9 m. That is
+            // firing while visibly not pointing at the zombie and trusting the
+            // bullet to fix it. The turn rate is high enough to finish the turn
+            // inside a frame or two at any range in the ring, so the only thing
+            // that slack ever bought was shooting sooner and wronger.
+            return IsOnTarget;
         }
 
         void Fire(Vector3 aimPoint)

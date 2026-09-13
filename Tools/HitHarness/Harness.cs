@@ -16,10 +16,10 @@ static class Harness
     const float ROUND_RADIUS  = 0.12f;  // Weapon_Pistol hitRadius
     const float LIFETIME      = 2.5f;
     const float RANGE         = 9f;
-    const float TURN_SPEED    = 720f;
+    const float TURN_SPEED    = 1440f;
     const float FIRE_INTERVAL = 1f / 3f;
     const float MUZZLE_FWD    = 1.16f;
-    const float MIN_ARC = 1.5f, MAX_ARC = 25f;
+    const float AIM_EPSILON = 0.01f;   // float noise, not a tolerance
     const float INACCURACY = 1f;
 
     class Round
@@ -86,11 +86,11 @@ static class Harness
 
                 if (dist <= RANGE)
                 {
-                    float angSize = Mathf.Atan2(ROUND_RADIUS + z.BodyRadius, Mathf.Max(0.01f, dist)) * Mathf.Rad2Deg;
-                    float steerBudget = LOCK_ON * (dist / SPEED) * 0.5f;
-                    float allowed = Mathf.Clamp(angSize + steerBudget, MIN_ARC, MAX_ARC);
+                    // Exactly on target, or no shot. RotateTowards clamps, so the
+                    // error is genuinely zero once the turn completes.
+                    bool onTarget = AngleBetween(turretDir, aim) <= AIM_EPSILON;
 
-                    if (cooldown <= 0f && AngleBetween(turretDir, aim) <= allowed)
+                    if (cooldown <= 0f && onTarget)
                     {
                         float err = (float)(rnd.NextDouble() * 2 - 1) * INACCURACY;
 

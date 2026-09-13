@@ -161,8 +161,8 @@ namespace ScalePunch.EditorTools
             Set(weapon, "muzzle", muzzle.transform);
             Set(weapon, "priority", AutoShoot.TargetPriority.Closest);
             Set(weapon, "targetStickiness", 1f);
-            Set(weapon, "minFiringArc", 1.5f);
-            Set(weapon, "maxFiringArc", 25f);
+            Set(weapon, "turnSpeed", 1440f);
+            Set(weapon, "aimEpsilon", 0.01f);
             Set(weapon, "maxLeadSeconds", 1f);
             Set(weapon, "avoidOverkill", true);
 
