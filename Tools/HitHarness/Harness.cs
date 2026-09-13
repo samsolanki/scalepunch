@@ -29,6 +29,8 @@ static class Harness
         public List<Enemy> alreadyHit = new List<Enemy>();
     }
 
+    static Vector3 sub(Vector3 a, Vector3 b) { Vector3 d = a - b; d.y = 0f; return d; }
+
     static Vector3 Rot(Vector3 v, float deg)
     {
         float r = deg * Mathf.Deg2Rad, c = Mathf.Cos(r), s = Mathf.Sin(r);
@@ -50,7 +52,8 @@ static class Harness
     }
 
     static void Engage(float zombieSpeed, float bodyRadius, float approachDeg, int seed,
-                       ref int fired, ref int hit, ref int missed, float startDistance = 16f)
+                       ref int fired, ref int hit, ref int missed, float startDistance = 16f,
+                       float jitter = 0f)
     {
         var rnd = new Random(seed);
         EnemyRegistry.Clear();
@@ -72,6 +75,16 @@ static class Harness
             Vector3 drift = Rot(toPlayer, 25f);
             Vector3 dir = (toPlayer * 0.8f + drift * 0.2f).normalized;
             z.transform.position = z.transform.position + dir * (zombieSpeed * DT);
+
+            // Frame-order jitter. Unity does not define whether the zombie moves
+            // before or after a round reads its position, so a round's segment can
+            // be computed against a stale spot. This models the worst case: the
+            // target is somewhere other than where the segment assumed.
+            if (jitter > 0f)
+            {
+                Vector3 nudge = Rot(dir, 90f) * ((float)(rnd.NextDouble() * 2 - 1) * jitter);
+                z.transform.position = z.transform.position + nudge;
+            }
             Vector3 zvel = (z.transform.position - prev) * (1f / DT);
             prev = z.transform.position;
             if (z.transform.position.magnitude < 0.6f) break;
@@ -127,6 +140,18 @@ static class Harness
                 Vector3 from = r.pos;
                 Vector3 to = from + r.dir * (SPEED * DT);
 
+                // Projectile.Reached: a guaranteed round resolves by proximity to
+                // its OWN target, not by intersecting the registry.
+                float reach = ROUND_RADIUS + z.BodyRadius;
+                Vector3 gap = sub(z.transform.position, to);
+                Vector3 remaining = sub(z.transform.position, from);
+                Vector3 travelled = sub(to, from);
+
+                bool reached = gap.magnitude <= reach
+                            || travelled.magnitude >= remaining.magnitude - reach;
+
+                if (!z.IsDead && reached) { rounds.RemoveAt(i); hit++; continue; }
+
                 Enemy struck = EnemyRegistry.FindFirstAlongSegment(from, to, ROUND_RADIUS, r.alreadyHit);
                 if (struck != null) { rounds.RemoveAt(i); hit++; continue; }
 
@@ -162,6 +187,11 @@ static class Harness
             for (int i = 0; i < 60; i++)
                 Engage(t.Speed, body, i * 6f, 1000 + i, ref fired, ref hit, ref missed,
                        startDistance: 0.3f + (i % 5) * 0.25f);
+
+            // Frame-order jitter, the failure the idealised cases never reproduced.
+            for (int i = 0; i < 60; i++)
+                Engage(t.Speed, body, i * 6f, 2000 + i, ref fired, ref hit, ref missed,
+                       startDistance: 9f, jitter: 0.35f);
 
             float rate = fired == 0 ? 0 : 100f * hit / fired;
             Console.WriteLine($"  {t.Name,-9} {body,5:0.00} {fired,8} {hit,6} {missed,7}  {rate,5:0.0}%");

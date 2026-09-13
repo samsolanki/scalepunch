@@ -11,6 +11,18 @@ namespace ScalePunch.Weapons
     /// EnemyRegistry rather than physics, so rounds need no colliders and no
     /// rigidbody — consistent with the rest of combat.
     /// </summary>
+    /// <summary>
+    /// Resolves last, after every zombie has already moved this frame.
+    ///
+    /// Unity does not define the order Update runs in between components, so
+    /// without this a round computed its swept segment against wherever the
+    /// zombie happened to be — before its step on some frames, after it on
+    /// others. When the zombie stepped off that segment the sweep correctly
+    /// reported no hit, and the round sailed past a target it was touching.
+    /// Frame-order dependent, so it failed intermittently and never in the
+    /// same place twice.
+    /// </summary>
+    [DefaultExecutionOrder(100)]
     public class Projectile : MonoBehaviour
     {
         [SerializeField] TrailRenderer trail;
@@ -88,7 +100,16 @@ namespace ScalePunch.Weapons
             if (dt <= 0f) return;   // hitstop — rounds hang in the air with everything else
 
             _lifeRemaining -= dt;
-            if (_lifeRemaining <= 0f) { Expire(); return; }
+            if (_lifeRemaining <= 0f)
+            {
+                // A guaranteed round delivers rather than expiring. The outcome
+                // was decided when the trigger was pulled; the flight is how it
+                // is shown, not whether it happens.
+                if (_guaranteed && TargetValid) { Deliver(_target, transform.position); return; }
+
+                Expire();
+                return;
+            }
 
             if (_guaranteed) KeepTarget();
             Steer(dt);
@@ -109,6 +130,20 @@ namespace ScalePunch.Weapons
             _rangeRemaining -= step;
 
             Vector3 to = from + _direction * step;
+
+            // Guaranteed rounds resolve by proximity to the zombie they were
+            // fired at, not by intersecting the registry.
+            //
+            // The sweep asks "does my segment cross any registered enemy", which
+            // is a different and weaker question than "have I reached my target".
+            // It can answer no while the round is sitting on top of the thing it
+            // was aimed at.
+            if (_guaranteed && TargetValid && Reached(from, to))
+            {
+                Deliver(_target, from);
+                return;
+            }
+
             Sweep(from, to);
             if (!_live) return;
 
@@ -180,6 +215,55 @@ namespace ScalePunch.Weapons
         /// </summary>
         bool TargetValid => _target != null && !_target.IsDead && _target.Generation == _targetGeneration;
 
+        /// <summary>
+        /// True if this frame's travel puts the round inside its target's reach,
+        /// or carries it past the target entirely.
+        /// </summary>
+        bool Reached(Vector3 from, Vector3 to)
+        {
+            Vector3 target = _target.transform.position;
+            float reach = _hitRadius + _target.BodyRadius;
+
+            Vector3 delta = target - to;
+            delta.y = 0f;
+            if (delta.sqrMagnitude <= reach * reach) return true;
+
+            // Closing faster than the gap: it would overshoot this frame, so
+            // arrival is this frame.
+            Vector3 remaining = target - from;
+            remaining.y = 0f;
+
+            Vector3 travelled = to - from;
+            travelled.y = 0f;
+
+            return travelled.magnitude >= remaining.magnitude - reach;
+        }
+
+        /// <summary>Applies this round's damage. The single place a hit happens,
+        /// so every path through the round reports it identically.</summary>
+        void Deliver(Enemy target, Vector3 from)
+        {
+            if (target == null || target.IsDead) { Expire(); return; }
+
+            _connected = true;
+            _alreadyHit.Add(target);
+
+            // Captured either side of the call so the log shows what the round
+            // actually removed, after armour — not the number it set out with.
+            float before = target.Health.Current;
+            target.Health.TakeDamage(new DamageInfo(_damage, _isCrit, from, gameObject));
+            WeaponTelemetry.ReportHit(_shotId, target, before - target.Health.Current,
+                                      before, target.Health.Current);
+
+            // Lifesteal resolves at the point of impact, not the point of firing —
+            // a round in flight has not healed anyone yet.
+            if (_lifestealFraction > 0f && _shooter != null)
+                _shooter.Heal(_damage * _lifestealFraction);
+
+            if (_pierceRemaining <= 0) { Expire(); return; }
+            _pierceRemaining--;
+        }
+
         void Sweep(Vector3 from, Vector3 to)
         {
             // Loops so one fast round can pierce several zombies standing in a
@@ -189,23 +273,7 @@ namespace ScalePunch.Weapons
                 Enemy hit = EnemyRegistry.FindFirstAlongSegment(from, to, _hitRadius, _alreadyHit);
                 if (hit == null) return;
 
-                _alreadyHit.Add(hit);
-                _connected = true;
-
-                // Captured either side of the call so the log shows what the round
-                // actually removed, after armour — not the number it set out with.
-                float before = hit.Health.Current;
-                hit.Health.TakeDamage(new DamageInfo(_damage, _isCrit, from, gameObject));
-                WeaponTelemetry.ReportHit(_shotId, hit, before - hit.Health.Current,
-                                          before, hit.Health.Current);
-
-                // Lifesteal resolves at the point of impact, not the point of
-                // firing — a round in flight has not healed anyone yet.
-                if (_lifestealFraction > 0f && _shooter != null)
-                    _shooter.Heal(_damage * _lifestealFraction);
-
-                if (_pierceRemaining <= 0) { Expire(); return; }
-                _pierceRemaining--;
+                Deliver(hit, from);
             }
         }
 

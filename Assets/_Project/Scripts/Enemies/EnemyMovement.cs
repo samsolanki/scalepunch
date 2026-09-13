@@ -8,6 +8,8 @@ namespace ScalePunch.Enemies
     /// 150 rigidbodies is the difference between 60 and 25 fps on mid-range
     /// Android, and none of this needs real physics.
     /// </summary>
+    /// <summary>Moves before anything reads its position this frame.</summary>
+    [DefaultExecutionOrder(-100)]
     public class EnemyMovement : MonoBehaviour
     {
         [Header("Separation")]

@@ -17,6 +17,29 @@ Exits non-zero if any round expires with a live target still in range.
 Target interception, turret slew, the firing arc, projectile homing, and the
 swept segment test against every tier's body radius.
 
+## Why a guaranteed round cannot miss
+
+Three things, each removing a whole class of failure rather than a case of it:
+
+1. **Deterministic frame order.** `EnemyMovement` runs at -100, `AutoShoot` at 0,
+   `Projectile` at 100. Unity does not define Update order between components,
+   so without this a round computed its swept segment against wherever the
+   zombie happened to be — before its step on some frames, after it on others.
+2. **Resolution against its own target.** A guaranteed round asks "have I
+   reached the zombie I was fired at", not "does my segment cross any
+   registered enemy". The second is a weaker question and can answer *no* while
+   the round sits on top of its target.
+3. **Delivery, not expiry.** A guaranteed round whose life runs out while its
+   target is alive applies its damage anyway. The outcome was decided when the
+   trigger was pulled; the flight is how it is shown, not whether it happens.
+
+Verified in both directions against frame-order jitter:
+
+```
+sweep only             93.9%   FAIL - 672 rounds never landed
+proximity resolution  100.0%   PASS
+```
+
 ## What it does NOT cover, and why that matters
 
 It exercises the **maths**, not the **runtime state**. Untested here:
@@ -55,6 +78,11 @@ post-fix  100.0%  PASS
 Point-blank cases are what catch it. Engagements that start at 16 m and walk in
 never sample the range where a round can spawn *past* its target, so the
 original harness passed happily while the bug was live.
+
+The same lesson applies twice over: the harness modelled an idealised world
+where the target sat exactly where the segment assumed. Adding frame-order
+jitter was what finally reproduced the intermittent misses seen in play. **When
+the harness and the game disagree, the harness is the thing that is wrong.**
 
 Run against the pre-fix flat-radius detection, the harness **still passes** —
 because the lock-on drives every round to the target's centre, where a 0.55 m

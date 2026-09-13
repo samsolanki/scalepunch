@@ -14,6 +14,8 @@ namespace ScalePunch.Player
     /// no aiming input (docs/01-game-design.md §2).
     /// </summary>
     [RequireComponent(typeof(PlayerStats))]
+    /// <summary>Aims after zombies have moved, before rounds resolve.</summary>
+    [DefaultExecutionOrder(0)]
     public class AutoShoot : MonoBehaviour
     {
         public enum TargetPriority
