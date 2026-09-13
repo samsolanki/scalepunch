@@ -340,6 +340,22 @@ namespace ScalePunch.EditorTools
                 for (int i = 0; i < data.zombies.Length; i++)
                     Check(data.zombies[i], $"zombie definition [{i}]");
 
+            // Stage data was unvalidated, and that is precisely how a build could
+            // report success and hand back a scene where nothing spawns: the
+            // spawner logs "No StageDefinition assigned" at Awake and the run
+            // simply stands still. Anything the spawner or run controller needs
+            // to function belongs here.
+            Check(data.boss, "boss definition");
+            Check(data.stage, "Stage_01");
+            Check(data.ramp, "SpawnRamp");
+            Check(data.prototype, "PrototypeConfig");
+
+            if (data.waves == null || data.waves.Length == 0)
+                missing.Add("wave definitions (empty)");
+            else
+                for (int i = 0; i < data.waves.Length; i++)
+                    Check(data.waves[i], $"wave definition [{i}]");
+
             Check(prefabs.bullet, "Projectile_Bullet prefab");
             Check(prefabs.gem, "XPGem prefab");
             Check(prefabs.zombie, "Zombie prefab");
