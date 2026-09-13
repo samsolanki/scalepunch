@@ -40,44 +40,58 @@ namespace ScalePunch.Abilities
         public AbilityInstance Get(AbilityDefinition definition)
             => _byDefinition.TryGetValue(definition, out AbilityInstance instance) ? instance : null;
 
-        /// <summary>Adds the ability at level 1, or raises it one level.</summary>
-        public void Grant(AbilityDefinition definition)
+        /// <summary>Adds the ability at level 1, or raises it one level, scaled
+        /// by the rarity the card rolled.</summary>
+        public void Grant(AbilityOffer offer)
         {
+            AbilityDefinition definition = offer.Definition;
             if (definition == null) return;
+
+            float magnitude = offer.Magnitude;
 
             if (_byDefinition.TryGetValue(definition, out AbilityInstance existing))
             {
                 if (existing.IsMaxed) return;
 
                 existing.LevelUp();
-                ApplyModifiers(existing.Current);
+                existing.RecordMagnitude(magnitude);
+                ApplyModifiers(existing.Current, magnitude);
                 Granted?.Invoke(existing);
                 return;
             }
 
             var instance = new AbilityInstance(definition);
+            instance.RecordMagnitude(magnitude);
             _owned.Add(instance);
             _byDefinition[definition] = instance;
 
-            ApplyModifiers(instance.Current);
+            ApplyModifiers(instance.Current, magnitude);
             Granted?.Invoke(instance);
         }
+
+        /// <summary>Convenience for code paths with no rarity roll — the fallback
+        /// card, and anything granting an ability outside a draft.</summary>
+        public void Grant(AbilityDefinition definition)
+            => Grant(new AbilityOffer(definition, AbilityRarity.Common,
+                                      Get(definition)?.Level ?? 0));
 
         /// <summary>
         /// Applies only the new level's modifiers, not a full recomputation.
         /// Abilities never level down mid-run, so deltas are sufficient and
         /// avoid re-deriving the whole sheet on every draft.
         /// </summary>
-        void ApplyModifiers(AbilityLevel level)
+        void ApplyModifiers(AbilityLevel level, float magnitude)
         {
             if (level == null || level.modifiers == null) return;
 
             foreach (StatModifier modifier in level.modifiers)
             {
+                float amount = modifier.value * magnitude;
+
                 if (modifier.kind == ModifierKind.Percent)
-                    stats.Stats.AddPercent(modifier.stat, modifier.value);
+                    stats.Stats.AddPercent(modifier.stat, amount);
                 else
-                    stats.Stats.AddFlat(modifier.stat, modifier.value);
+                    stats.Stats.AddFlat(modifier.stat, amount);
             }
         }
 
@@ -98,7 +112,8 @@ namespace ScalePunch.Abilities
                 if (effect == null) continue;
 
                 effect.Execute(
-                    new AbilityContext(transform, stats.Stats, instance.Current, gameObject, range),
+                    new AbilityContext(transform, stats.Stats, instance.Current, gameObject,
+                                       range, instance.Magnitude),
                     this);
             }
         }

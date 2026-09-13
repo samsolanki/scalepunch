@@ -11,12 +11,25 @@ namespace ScalePunch.Weapons
     /// EnemyRegistry rather than physics, so rounds need no colliders and no
     /// rigidbody — consistent with the rest of combat.
     /// </summary>
+    /// <summary>
+    /// Resolves last, after every zombie has already moved this frame.
+    ///
+    /// Unity does not define the order Update runs in between components, so
+    /// without this a round computed its swept segment against wherever the
+    /// zombie happened to be — before its step on some frames, after it on
+    /// others. When the zombie stepped off that segment the sweep correctly
+    /// reported no hit, and the round sailed past a target it was touching.
+    /// Frame-order dependent, so it failed intermittently and never in the
+    /// same place twice.
+    /// </summary>
+    [DefaultExecutionOrder(100)]
     public class Projectile : MonoBehaviour
     {
         [SerializeField] TrailRenderer trail;
 
         Vector3 _direction;
         Enemy _target;
+        int _targetGeneration;
         float _damage;
         float _speed;
         float _hitRadius;
@@ -24,6 +37,11 @@ namespace ScalePunch.Weapons
         float _rangeRemaining;
         float _lifeRemaining;
         float _lifestealFraction;
+        bool _reserved;
+        bool _connected;
+        int _shotId;
+        bool _guaranteed;
+        float _retargetRadius;
         Health _shooter;
         bool _isCrit;
         int _pierceRemaining;
@@ -31,19 +49,14 @@ namespace ScalePunch.Weapons
 
         readonly List<Enemy> _alreadyHit = new(4);
 
-        /// <summary>Diagnostic only: total rounds that have connected this run.
-        /// Read by CombatDiagnostics; remove with it.</summary>
-        public static int TotalHits;
-        /// <summary>Diagnostic only: rounds that expired without hitting anything.</summary>
-        public static int TotalMisses;
-
         /// <summary>Raised when the round is spent, so the pool can reclaim it.</summary>
         public System.Action<Projectile> Expired;
 
         public void Launch(Vector3 origin, Vector3 direction, Enemy target,
                            float damage, bool isCrit, float speed, float hitRadius,
                            int pierce, float range, float lifetime, float steerDegPerSec,
-                           Health shooter = null, float lifestealFraction = 0f)
+                           Health shooter = null, float lifestealFraction = 0f,
+                           bool guaranteedHit = false, float retargetRadius = 4f)
         {
             transform.position = origin;
 
@@ -52,6 +65,7 @@ namespace ScalePunch.Weapons
             transform.rotation = Quaternion.LookRotation(_direction, Vector3.up);
 
             _target = target;
+            _targetGeneration = target != null ? target.Generation : 0;
             _damage = damage;
             _isCrit = isCrit;
             _speed = speed;
@@ -63,6 +77,16 @@ namespace ScalePunch.Weapons
             _shooter = shooter;
             _lifestealFraction = lifestealFraction;
             _live = true;
+
+            // Claim this round's damage against the target for as long as it is
+            // in the air, so the turret can see the kill coming and move on.
+            _reserved = target != null && !target.IsDead;
+            if (_reserved) target.ReserveDamage(damage);
+
+            _guaranteed = guaranteedHit;
+            _retargetRadius = retargetRadius;
+            _connected = false;
+            _shotId = WeaponTelemetry.ReportFired(target, origin);
 
             _alreadyHit.Clear();
             if (trail != null) trail.Clear();
@@ -76,19 +100,50 @@ namespace ScalePunch.Weapons
             if (dt <= 0f) return;   // hitstop — rounds hang in the air with everything else
 
             _lifeRemaining -= dt;
-            if (_lifeRemaining <= 0f) { Expire(); return; }
+            if (_lifeRemaining <= 0f)
+            {
+                // A guaranteed round delivers rather than expiring. The outcome
+                // was decided when the trigger was pulled; the flight is how it
+                // is shown, not whether it happens.
+                if (_guaranteed && TargetValid) { Deliver(_target, transform.position); return; }
 
+                Expire();
+                return;
+            }
+
+            if (_guaranteed) KeepTarget();
             Steer(dt);
 
             Vector3 from = transform.position;
             float step = _speed * dt;
 
-            // Rounds die at the edge of the engagement radius, not somewhere
-            // vague off screen, so the range stat means exactly what it shows.
-            if (step >= _rangeRemaining) { Expire(); return; }
+            // Rounds die at the edge of the engagement radius, so the range stat
+            // means exactly what it shows.
+            //
+            // Except while a guaranteed round still has something to hit: the
+            // range gate is about how far the gun reaches, and the target was
+            // inside that when the trigger went. Expiring mid-flight because the
+            // zombie walked a step would break the guarantee over a technicality.
+            bool rangeBound = !_guaranteed || !TargetValid;
+
+            if (rangeBound && step >= _rangeRemaining) { Expire(); return; }
             _rangeRemaining -= step;
 
             Vector3 to = from + _direction * step;
+
+            // Guaranteed rounds resolve by proximity to the zombie they were
+            // fired at, not by intersecting the registry.
+            //
+            // The sweep asks "does my segment cross any registered enemy", which
+            // is a different and weaker question than "have I reached my target".
+            // It can answer no while the round is sitting on top of the thing it
+            // was aimed at.
+            if (_guaranteed && TargetValid && Reached(from, to))
+            {
+                Deliver(_target, from);
+                return;
+            }
+
             Sweep(from, to);
             if (!_live) return;
 
@@ -96,18 +151,117 @@ namespace ScalePunch.Weapons
             transform.rotation = Quaternion.LookRotation(_direction, Vector3.up);
         }
 
+        /// <summary>
+        /// Steers toward a freshly solved intercept, not toward where the target
+        /// currently stands.
+        ///
+        /// Chasing the current position is pursuit guidance, and pursuit always
+        /// curves in behind a crossing target. Against the turret's lead it was
+        /// worse than useless: the turret aimed at where the zombie would be and
+        /// this dragged the round back to where it was, erasing the lead a frame
+        /// at a time. Re-solving keeps the round on an interception course as the
+        /// target manoeuvres, which is the only thing homing should be doing.
+        /// </summary>
+        /// <summary>
+        /// Hands a round whose target died to the nearest zombie instead of
+        /// letting it sail into empty floor. A round with nothing to hit is not a
+        /// miss, but it is still a wasted round.
+        /// </summary>
+        void KeepTarget()
+        {
+            if (TargetValid) return;
+            if (_retargetRadius <= 0f) return;
+
+            Enemy replacement = EnemyRegistry.FindNearestExcluding(
+                transform.position, _retargetRadius, _alreadyHit);
+
+            if (replacement == null) return;
+
+            ReleaseReservation();
+
+            _target = replacement;
+            _targetGeneration = replacement.Generation;
+
+            _reserved = true;
+            replacement.ReserveDamage(_damage);
+        }
+
         void Steer(float dt)
         {
             if (_steerDegPerSec <= 0f) return;
-            if (_target == null || _target.IsDead) return;
+            if (!TargetValid) return;
 
-            Vector3 toTarget = _target.transform.position - transform.position;
-            toTarget.y = 0f;
-            if (toTarget.sqrMagnitude < 0.0001f) return;
+            Vector3 targetVelocity = _target.Movement != null ? _target.Movement.Velocity : Vector3.zero;
+            Vector3 aimPoint = Ballistics.Intercept(transform.position, _target.transform.position,
+                                                    targetVelocity, _speed);
+
+            Vector3 toAim = aimPoint - transform.position;
+            toAim.y = 0f;
+            if (toAim.sqrMagnitude < 0.0001f) return;
 
             _direction = Vector3.RotateTowards(
-                _direction, toTarget.normalized,
+                _direction, toAim.normalized,
                 _steerDegPerSec * Mathf.Deg2Rad * dt, 0f).normalized;
+        }
+
+        /// <summary>Reports whether the round ever touched anything, so a round
+        /// spent on an already-dying zombie is not counted as an aiming failure.</summary>
+        /// <summary>
+        /// The round is still locked onto the same zombie it was fired at.
+        ///
+        /// The generation check is the whole point: a pooled Enemy that died and
+        /// was re-spawned passes `!IsDead` while being an entirely different
+        /// zombie somewhere else on the field.
+        /// </summary>
+        bool TargetValid => _target != null && !_target.IsDead && _target.Generation == _targetGeneration;
+
+        /// <summary>
+        /// True if this frame's travel puts the round inside its target's reach,
+        /// or carries it past the target entirely.
+        /// </summary>
+        bool Reached(Vector3 from, Vector3 to)
+        {
+            Vector3 target = _target.transform.position;
+            float reach = _hitRadius + _target.BodyRadius;
+
+            Vector3 delta = target - to;
+            delta.y = 0f;
+            if (delta.sqrMagnitude <= reach * reach) return true;
+
+            // Closing faster than the gap: it would overshoot this frame, so
+            // arrival is this frame.
+            Vector3 remaining = target - from;
+            remaining.y = 0f;
+
+            Vector3 travelled = to - from;
+            travelled.y = 0f;
+
+            return travelled.magnitude >= remaining.magnitude - reach;
+        }
+
+        /// <summary>Applies this round's damage. The single place a hit happens,
+        /// so every path through the round reports it identically.</summary>
+        void Deliver(Enemy target, Vector3 from)
+        {
+            if (target == null || target.IsDead) { Expire(); return; }
+
+            _connected = true;
+            _alreadyHit.Add(target);
+
+            // Captured either side of the call so the log shows what the round
+            // actually removed, after armour — not the number it set out with.
+            float before = target.Health.Current;
+            target.Health.TakeDamage(new DamageInfo(_damage, _isCrit, from, gameObject));
+            WeaponTelemetry.ReportHit(_shotId, target, before - target.Health.Current,
+                                      before, target.Health.Current);
+
+            // Lifesteal resolves at the point of impact, not the point of firing —
+            // a round in flight has not healed anyone yet.
+            if (_lifestealFraction > 0f && _shooter != null)
+                _shooter.Heal(_damage * _lifestealFraction);
+
+            if (_pierceRemaining <= 0) { Expire(); return; }
+            _pierceRemaining--;
         }
 
         void Sweep(Vector3 from, Vector3 to)
@@ -119,28 +273,49 @@ namespace ScalePunch.Weapons
                 Enemy hit = EnemyRegistry.FindFirstAlongSegment(from, to, _hitRadius, _alreadyHit);
                 if (hit == null) return;
 
-                _alreadyHit.Add(hit);
-                TotalHits++;
-                hit.Health.TakeDamage(new DamageInfo(_damage, _isCrit, from, gameObject));
-
-                // Lifesteal resolves at the point of impact, not the point of
-                // firing — a round in flight has not healed anyone yet.
-                if (_lifestealFraction > 0f && _shooter != null)
-                    _shooter.Heal(_damage * _lifestealFraction);
-
-                if (_pierceRemaining <= 0) { Expire(); return; }
-                _pierceRemaining--;
+                Deliver(hit, from);
             }
         }
 
         void Expire()
         {
             if (!_live) return;
-            if (_alreadyHit.Count == 0) TotalMisses++;
+
             _live = false;
+
+            // A connected round already reported itself at the moment of impact,
+            // which is also the only place the real damage figure exists.
+            if (!_connected)
+            {
+                if (TargetValid) WeaponTelemetry.ReportExpired(_shotId, transform.position, _target, _hitRadius);
+                else WeaponTelemetry.ReportWasted(_shotId);
+            }
+
+            ReleaseReservation();
             Expired?.Invoke(this);
         }
 
-        void OnDisable() => _live = false;
+        /// <summary>
+        /// Hands the claim back. Must run on every exit path — a round that dies
+        /// without releasing leaves its target permanently looking doomed, and
+        /// the turret never shoots it again.
+        /// </summary>
+        void ReleaseReservation()
+        {
+            if (!_reserved) return;
+
+            _reserved = false;
+
+            // Only give the claim back to the zombie it was made against. A
+            // recycled Enemy is a different zombie, and refunding it damage it
+            // never had reservations for corrupts its IsDoomed state.
+            if (TargetValid) _target.ReleaseDamage(_damage);
+        }
+
+        void OnDisable()
+        {
+            _live = false;
+            ReleaseReservation();
+        }
     }
 }

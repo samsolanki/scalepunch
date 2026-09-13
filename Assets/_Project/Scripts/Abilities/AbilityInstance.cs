@@ -9,6 +9,17 @@ namespace ScalePunch.Abilities
         public int Level { get; private set; }
         public float CooldownRemaining { get; private set; }
 
+        /// <summary>
+        /// Magnitude multiplier from the rarity this was taken at. Kept as the
+        /// best roll rather than the latest: taking a Legendary and then a Common
+        /// of the same ability should never be a downgrade, or the draft starts
+        /// punishing the player for levelling something up.
+        /// </summary>
+        public float Magnitude { get; private set; } = 1f;
+
+        public void RecordMagnitude(float magnitude)
+            => Magnitude = Mathf.Max(Magnitude, magnitude);
+
         public AbilityLevel Current => Definition.LevelData(Level);
         public bool IsMaxed => Level >= Definition.MaxLevel;
         public bool IsActive => Definition.kind == AbilityKind.Active;

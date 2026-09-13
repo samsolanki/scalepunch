@@ -38,6 +38,20 @@ namespace ScalePunch.Weapons
         [Tooltip("Random angular error applied per round. Keep small; this is felt as unfairness.")]
         [Range(0f, 15f)] public float inaccuracyDegrees = 1.5f;
 
+        [Header("Guaranteed hit")]
+        [Tooltip("Every round that leaves this barrel reaches its target.\n\n" +
+                 "Costs are real and worth knowing: ProjectileSpeed stops affecting " +
+                 "whether you hit and becomes purely how fast the tracer looks, and " +
+                 "a spread weapon's pellets all converge on one zombie instead of " +
+                 "covering an arc. Leave it off for a shotgun.")]
+        public bool guaranteedHit = true;
+
+        [Tooltip("Turn rate used while guaranteedHit is on. Pursuit converges whenever " +
+                 "the chaser is faster than the target, but only if it can turn fast " +
+                 "enough to hold the line of sight: a Runner crossing at 1 m needs about " +
+                 "260 deg/s. This is that, with margin.")]
+        public float lockOnDegreesPerSecond = 720f;
+
         [Header("Homing")]
         [Tooltip("Degrees per second a round may steer toward its target. 0 = dumb-fire. " +
                  "A little steering hides aim error against runners without feeling like a lock-on.")]

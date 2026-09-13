@@ -19,13 +19,22 @@ namespace ScalePunch.Combat
             public float value;
         }
 
+        /// <summary>
+        /// The player's starting damage per round, and the anchor the whole
+        /// enemy HP ladder is derived from — a Shambler is "one bullet" because
+        /// its HP is exactly this. Changing it here changes every tier's
+        /// bullets-to-kill, so RunSceneBuilder reads this constant rather than
+        /// keeping its own copy.
+        /// </summary>
+        public const float BaseDamage = 5f;
+
         [SerializeField]
         BaseValue[] baseValues =
         {
             new() { stat = StatType.MaxHP,           value = 100f },
-            // 5 damage against a 5 HP Shambler is one bullet, one kill - the
-            // clearest possible read on whether the gun is working.
-            new() { stat = StatType.Damage,          value = 5f   },
+            // One bullet, one Shambler - the clearest possible read on whether
+            // the gun is working.
+            new() { stat = StatType.Damage,          value = BaseDamage },
             new() { stat = StatType.FireRate,        value = 3.0f },
             new() { stat = StatType.Range,           value = 9.0f },
             new() { stat = StatType.CritChance,      value = 0.05f },
@@ -65,6 +74,27 @@ namespace ScalePunch.Combat
             float value = (b + flat) * (1f + pct);
             _cache[stat] = value;
             return value;
+        }
+
+        /// <summary>
+        /// What Get would return if this modifier were applied, without applying
+        /// it. Draft cards need the real resulting number, and a flat bonus does
+        /// not simply add to the current value once percent bonuses exist — it
+        /// goes inside the same (base + flat) * (1 + percent) that everything
+        /// else does.
+        /// </summary>
+        public float Preview(StatType stat, bool percent, float amount)
+        {
+            if (!_built) Build();
+
+            _base.TryGetValue(stat, out float b);
+            _flat.TryGetValue(stat, out float flat);
+            _percent.TryGetValue(stat, out float pct);
+
+            if (percent) pct += amount;
+            else flat += amount;
+
+            return (b + flat) * (1f + pct);
         }
 
         public void AddFlat(StatType stat, float amount)

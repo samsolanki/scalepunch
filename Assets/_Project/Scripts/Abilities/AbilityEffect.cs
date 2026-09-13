@@ -13,19 +13,22 @@ namespace ScalePunch.Abilities
         /// <summary>The player's engagement radius — effects that need a
         /// meaningful reach should scale off this, not a magic number.</summary>
         public readonly float EngagementRange;
+        /// <summary>Rarity multiplier from the card this was taken at.</summary>
+        public readonly float Magnitude;
 
         public AbilityContext(Transform origin, StatSheet stats, AbilityLevel level,
-                              GameObject source, float engagementRange)
+                              GameObject source, float engagementRange, float magnitude = 1f)
         {
             Origin = origin;
             Stats = stats;
             Level = level;
             Source = source;
             EngagementRange = engagementRange;
+            Magnitude = magnitude;
         }
 
         /// <summary>Base damage for this effect, before the crit roll.</summary>
-        public float Damage => Stats.Get(StatType.Damage) * Level.damageMultiplier;
+        public float Damage => Stats.Get(StatType.Damage) * Level.damageMultiplier * Magnitude;
     }
 
     /// <summary>

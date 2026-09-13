@@ -36,6 +36,11 @@ Engine: Unity 6 LTS, URP, 3D.
 | [`docs/04-monetization-and-launch.md`](docs/04-monetization-and-launch.md) | Ad placements, IAP catalogue, analytics events, KPI targets, Play Store checklist, cloning legalities |
 | [`docs/05-m0-setup.md`](docs/05-m0-setup.md) | How to wire the M0 combat scripts into a Unity scene, and what to tune first |
 | [`docs/06-m1-setup.md`](docs/06-m1-setup.md) | XP, the level-up draft, the ability roster to author, and the HUD |
+| [`docs/07-save-and-currency.md`](docs/07-save-and-currency.md) | The profile format, the migration rule, currencies, and the editor save tools |
+| [`docs/08-draft-screen.md`](docs/08-draft-screen.md) | What triggers a draft, everything a card shows, and the rarity table |
+| [`docs/09-art-direction.md`](docs/09-art-direction.md) | The art style, why, what to buy, and the readability check to run first |
+| [`docs/10-asset-list.md`](docs/10-asset-list.md) | Every model and animation clip to make, with the exact timings the code expects |
+| [`docs/11-model-prompts.md`](docs/11-model-prompts.md) | Text-to-image prompts for the five character concepts |
 
 ## Start here
 

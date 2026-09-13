@@ -6,7 +6,9 @@ using ScalePunch.Abilities;
 using ScalePunch.Abilities.Effects;
 using ScalePunch.Combat;
 using ScalePunch.Data;
+using ScalePunch.Core;
 using ScalePunch.Enemies;
+using ScalePunch.Stages;
 using ScalePunch.Progression;
 using ScalePunch.Weapons;
 
@@ -25,7 +27,12 @@ namespace ScalePunch.EditorTools
             public LevelCurve curve;
             public WeaponDefinition pistol;
             public EnemyDefinition[] zombies;
+            public EnemyDefinition boss;
+            public WaveDefinition[] waves;
+            public StageDefinition stage;
+            public SpawnRamp ramp;
             public AbilityLibrary library;
+            public PrototypeConfig prototype;
         }
 
         // ----------------------------------------------------------- materials
@@ -86,6 +93,7 @@ namespace ScalePunch.EditorTools
         {
             var set = new DataSet
             {
+                prototype = Asset<PrototypeConfig>("PrototypeConfig"),
                 tuning = Asset<CombatTuning>("CombatTuning"),
                 curve  = Asset<LevelCurve>("LevelCurve"),
                 pistol = Asset<WeaponDefinition>("Weapon_Pistol")
@@ -96,11 +104,10 @@ namespace ScalePunch.EditorTools
             // extraProjectiles and spread raised - no code change.
             set.pistol.id = "pistol";
             set.pistol.displayName = "Pistol";
-            // The zombie capsule is 0.5 radius and the round about 0.05, so 0.55
-            // is the radius at which a visual contact and a registered hit agree.
-            // Erring generous here is invisible; erring tight reads as bullets
-            // passing through zombies.
-            set.pistol.hitRadius = 0.55f;
+            // The round's own radius only. The target's body radius is added at
+            // detection time and scales per tier, so this no longer has to be a
+            // compromise that fits a Shambler and misses a Brute.
+            set.pistol.hitRadius = 0.12f;
             set.pistol.lifetime = 2.5f;
             set.pistol.damageMultiplier = 1f;
             set.pistol.fireRateMultiplier = 1f;
@@ -108,24 +115,65 @@ namespace ScalePunch.EditorTools
             set.pistol.projectileSpeedMultiplier = 1f;
             set.pistol.extraProjectiles = 0;
             set.pistol.spreadDegrees = 0f;
+
+            // Kept at 1 degree even under guaranteed hit: the lock-on corrects it
+            // inside a single frame, and it stops every tracer leaving on the
+            // exact same line, which reads as a laser rather than gunfire.
             set.pistol.inaccuracyDegrees = 1.0f;
 
+            // Every round reaches its target. Pursuit converges whenever the round
+            // is faster than the target — 45 m/s against 4.5 — but only if it can
+            // turn fast enough to hold the line of sight. A Runner crossing at the
+            // 0.55 m hit radius swings that line at roughly 470 deg/s, so 720 is
+            // the rate with margin rather than a round number.
+            set.pistol.guaranteedHit = true;
+            set.pistol.lockOnDegreesPerSecond = 720f;
+
             // Barely any steering. 220 deg/s let rounds visibly curve after a
-            // target, which reads as a guided missile, not a bullet. Just enough
-            // to correct for a Runner crossing the line of fire.
-            set.pistol.steerDegreesPerSecond = 45f;
+            // target, which reads as a guided missile, not a bullet.
+            //
+            // It used to be papering over pursuit aiming; the turret solves a real
+            // intercept now, so this only has to absorb a target that changes
+            // direction after the round is already in the air.
+            set.pistol.steerDegreesPerSecond = 35f;
+
+            // Drafts fire on kill count, not collected XP, so a threshold reads
+            // as exactly what it says: the first card at 5 zombies, the second
+            // at 15. Gems stop spawning in this mode — see XPGemService.
+            set.curve.source = ProgressSource.Kills;
+            set.curve.cumulativeThresholds = new[] { 5, 15, 30, 50, 75, 105, 140, 180, 225, 275 };
 
             set.zombies = BuildZombies();
-            set.library = BuildAbilities();
+            set.boss = BuildBoss();
+            set.waves = BuildWaves(set.zombies, set.boss);
+            set.stage = BuildStage(set.waves, set.boss);
+            set.ramp = BuildSpawnRamp(set.zombies);
+            set.library = BuildAbilities(set.prototype);
 
             // Echo the values actually written. Unity can run a queued menu item
             // against the pre-reload assembly if it is clicked while a compile is
             // finishing, and the only symptom is stale data with a clean log.
             // This line makes which code ran unambiguous.
+            LogBulletLadder(set);
+            LogSpawnRamp(set);
+
             Debug.Log($"[ScalePunch] Data written: shambler {set.zombies[0].baseHP} HP, " +
                       $"runner {set.zombies[1].baseHP} HP, " +
                       $"brute {set.zombies[2].baseHP} HP / armour {set.zombies[2].armor}, " +
-                      $"steer {set.pistol.steerDegreesPerSecond} deg/s");
+                      $"steer {set.pistol.steerDegreesPerSecond} deg/s, " +
+                      $"guaranteedHit {set.pistol.guaranteedHit}, " +
+                      $"prototype: waves {set.prototype.waves}, boss {set.prototype.boss}, " +
+                      $"rarity {set.prototype.abilityRarity}, save {set.prototype.saveAndCurrency}, " +
+                      $"{set.library.abilities.Count} abilities. " +
+                      $"drafts at {string.Join('/', set.curve.cumulativeThresholds)} kills, " +
+                      $"stage '{set.stage.id}' {set.stage.WaveCount} waves / " +
+                      $"{set.stage.TotalWaveSeconds():0}s + boss {set.boss.baseHP} HP");
+
+            EditorUtility.SetDirty(set.ramp);
+            EditorUtility.SetDirty(set.prototype);
+            EditorUtility.SetDirty(set.stage);
+            EditorUtility.SetDirty(set.boss);
+            foreach (WaveDefinition w in set.waves) EditorUtility.SetDirty(w);
 
             EditorUtility.SetDirty(set.tuning);
             EditorUtility.SetDirty(set.curve);
@@ -142,6 +190,15 @@ namespace ScalePunch.EditorTools
         /// </summary>
         static void Reacquire(DataSet set)
         {
+            set.prototype = Keep(LoadData<PrototypeConfig>("PrototypeConfig"), set.prototype);
+            set.boss = Keep(LoadData<EnemyDefinition>("Zombie_Boss"), set.boss);
+            set.stage = Keep(LoadData<StageDefinition>("Stage_01"), set.stage);
+            set.ramp = Keep(LoadData<SpawnRamp>("SpawnRamp"), set.ramp);
+
+            if (set.waves != null)
+                for (int i = 0; i < set.waves.Length; i++)
+                    set.waves[i] = Keep(LoadData<WaveDefinition>($"Wave_{i + 1:00}"), set.waves[i]);
+
             set.tuning = Keep(LoadData<CombatTuning>("CombatTuning"), set.tuning);
             set.curve = Keep(LoadData<LevelCurve>("LevelCurve"), set.curve);
             set.pistol = Keep(LoadData<WeaponDefinition>("Weapon_Pistol"), set.pistol);
@@ -161,9 +218,20 @@ namespace ScalePunch.EditorTools
             set.zombies = zombies;
         }
 
+        /// <summary>
+        /// The player's base Damage, read from StatSheet rather than copied.
+        /// Every zombie's HP derives from it, so "two bullets" stays two bullets
+        /// when the damage number changes instead of quietly becoming three.
+        /// </summary>
+        const float BaseBulletDamage = StatSheet.BaseDamage;
+
+        /// <summary>HP for a zombie that should die in exactly N un-crit rounds.</summary>
+        static float Bullets(int count) => BaseBulletDamage * count;
+
         static EnemyDefinition Zombie(string file, string id, float hp, float damage,
                                       float speed, float knockbackResist, int xp,
-                                      float scale, EnemyBehaviour behaviour, float armor = 0f)
+                                      float scale, EnemyBehaviour behaviour, float armor = 0f,
+                                      float hpGrowth = 1f, float damageGrowth = 1f)
         {
             EnemyDefinition def = Asset<EnemyDefinition>(file);
 
@@ -179,8 +247,39 @@ namespace ScalePunch.EditorTools
             def.xpValue = xp;
             def.scale = scale;
 
+            // Clear daylight between the bodies. 0.15 was geometrically correct
+            // and visually invisible — two capsules 0.15 m apart still read as
+            // touching at this camera height.
+            def.standoffGap = 0.6f;
+
+            // Growth defaults to 1 (off). A bullet ladder that only holds for the
+            // first twenty seconds is worse than no ladder, because nothing tells
+            // the player — or you — the moment it stops being true.
+            def.hpGrowthPerWave = hpGrowth;
+            def.damageGrowthPerWave = damageGrowth;
+
             EditorUtility.SetDirty(def);
             return def;
+        }
+
+        /// <summary>
+        /// Prints the bullets-to-kill ladder at wave 0 and wave 8. If the two
+        /// columns disagree, HP scaling is on and the ladder is a wave-0 promise
+        /// the game stops keeping — which is exactly the failure this exists to
+        /// surface.
+        /// </summary>
+        static void LogBulletLadder(DataSet set)
+        {
+            var sb = new System.Text.StringBuilder("[ScalePunch] Bullets to kill @ ");
+            sb.Append(BaseBulletDamage).Append(" damage  (wave 0 -> wave 8)\n");
+
+            foreach (EnemyDefinition def in set.zombies)
+                sb.Append($"  {def.id,-10} {def.BulletsToKill(BaseBulletDamage),3}  ->{def.BulletsToKill(BaseBulletDamage, 8),3}\n");
+
+            if (set.boss != null)
+                sb.Append($"  {set.boss.id,-10} {set.boss.BulletsToKill(BaseBulletDamage),3}  ->{set.boss.BulletsToKill(BaseBulletDamage, 8),3}");
+
+            Debug.Log(sb.ToString());
         }
 
         static EnemyDefinition[] BuildZombies()
@@ -190,11 +289,17 @@ namespace ScalePunch.EditorTools
                 // 5 HP against 5 damage: exactly one bullet per Shambler at
                 // wave 0. That one-shot read is the whole point of the basic
                 // zombie - it is how the player learns the gun works.
-                Zombie("Zombie_Shambler", "shambler",  5f,  8f, 2.5f, 0f, 1, 1.00f, EnemyBehaviour.Shambler),
+                // ONE bullet. The baseline the whole game is read against: if a
+                // Shambler ever needs two, every tier above it has silently moved.
+                Zombie("Zombie_Shambler", "shambler", Bullets(1), 8f, 2.5f, 0f, 1, 1.00f,
+                       EnemyBehaviour.Shambler),
                 // Medium tier: two bullets. Fast enough to cross the ring in the
                 // time those two shots take, which is what makes fire rate the
                 // stat that answers it.
-                Zombie("Zombie_Runner",   "runner",   10f,  6f, 4.5f, 0f, 2, 0.85f, EnemyBehaviour.Runner),
+                // TWO bullets, but nearly twice the speed. Fragile and quick —
+                // it punishes low fire rate, not low damage.
+                Zombie("Zombie_Runner", "runner", Bullets(2), 6f, 4.5f, 0f, 2, 0.85f,
+                       EnemyBehaviour.Runner),
 
                 // Brutes are knockback-immune. Without that, sustained fire
                 // stunlocks them at the edge of the ring and they stop being a
@@ -208,8 +313,276 @@ namespace ScalePunch.EditorTools
                 // with armour 1 a 5 damage round only lands 4, so 10 HP would take
                 // three shots, not two. Anything that must die in a countable
                 // number of hits has to have no armour at all.
-                Zombie("Zombie_Brute",    "brute",    10f, 18f, 1.4f, 1f, 4, 1.45f, EnemyBehaviour.Brute, armor: 0f)
+                // SIX bullets and knockback-immune. This is the damage check —
+                // the tier that makes Heavy Rounds worth drafting.
+                //
+                // Armour stays at 0 deliberately. Armour and "dies in exactly N
+                // bullets" pull against each other: at armour 1 a 5-damage round
+                // lands 4, so 30 HP becomes eight shots rather than six. Anything
+                // with a countable bullet budget cannot also carry armour.
+                Zombie("Zombie_Brute", "brute", Bullets(6), 18f, 1.4f, 1f, 4, 1.45f,
+                       EnemyBehaviour.Brute, armor: 0f)
             };
+        }
+
+        // --------------------------------------------------------- boss & stage
+
+        static EnemyDefinition BuildBoss()
+        {
+            // Deliberately not a wall of HP. The boss is interesting because of
+            // its charge, and a fight long enough to be boring is worse than one
+            // that ends while the telegraph is still exciting. 180 HP against a
+            // levelled-up build is roughly 25-40 seconds.
+            // FORTY bullets — about 13 seconds of unbroken fire at the base rate,
+            // less once the run has upgrades in it. Long enough to be a fight,
+            // short enough that the charge telegraph is still exciting the last
+            // time it plays.
+            EnemyDefinition def = Zombie("Zombie_Boss", "boss", Bullets(40), 22f, 1.6f,
+                                        knockbackResist: 1f, xp: 40, scale: 2.2f,
+                                        behaviour: EnemyBehaviour.Brute, armor: 0f);
+
+            // Longer reach and a slower swing than a Brute: the boss should feel
+            // heavy, and its melee is not the threat — the charge is.
+            def.attackInterval = 1.4f;
+            def.attackRange = 2.0f;
+            return def;
+        }
+
+        static WaveEntry Entry(EnemyDefinition enemy, float at, int count,
+                               SpawnPattern pattern, float spread, float arc = 90f) => new()
+        {
+            enemy = enemy,
+            timeOffset = at,
+            count = count,
+            pattern = pattern,
+            spreadSeconds = spread,
+            arcDegrees = arc
+        };
+
+        static WaveDefinition Wave(int number, string display, float duration, params WaveEntry[] entries)
+        {
+            WaveDefinition wave = Asset<WaveDefinition>($"Wave_{number:00}");
+            wave.displayName = display;
+            wave.entries = entries;
+
+            // Every duration below is hand-checked against its entries' last
+            // arrival; WaveDefinition.OnValidate is the backstop for hand edits
+            // in the inspector, not for these.
+            wave.duration = duration;
+
+            EditorUtility.SetDirty(wave);
+            return wave;
+        }
+
+        /// <summary>
+        /// Eight waves, about four minutes, shaped as a curve rather than a ramp:
+        /// each wave introduces or recombines one thing, and waves 4 and 7 are
+        /// deliberately lighter. Unbroken escalation reads as flat — the dips are
+        /// what make the peaks land.
+        /// </summary>
+        static WaveDefinition[] BuildWaves(EnemyDefinition[] zombies, EnemyDefinition boss)
+        {
+            EnemyDefinition shambler = zombies[0];
+            EnemyDefinition runner = zombies[1];
+            EnemyDefinition brute = zombies[2];
+
+            return new[]
+            {
+                // 1 - teach the ring. A trickle from all sides, nothing dangerous.
+                Wave(1, "Trickle", 22f,
+                     Entry(shambler, 1f, 6, SpawnPattern.Ring, 8f)),
+
+                // 2 - first pressure direction: they come from one side.
+                Wave(2, "Pressure", 24f,
+                     Entry(shambler, 0f, 8, SpawnPattern.Ring, 10f),
+                     Entry(shambler, 12f, 6, SpawnPattern.Arc, 4f, 70f)),
+
+                // 3 - runners. Punishes a build that took no fire rate.
+                Wave(3, "Sprinters", 26f,
+                     Entry(shambler, 0f, 6, SpawnPattern.Ring, 8f),
+                     Entry(runner, 8f, 6, SpawnPattern.Arc, 3f, 60f),
+                     Entry(runner, 17f, 8, SpawnPattern.Ring, 5f)),
+
+                // 4 - lull. One Brute, alone, with room to see what it is.
+                Wave(4, "The Big One", 24f,
+                     Entry(brute, 2f, 1, SpawnPattern.Point, 0f),
+                     Entry(shambler, 10f, 6, SpawnPattern.Ring, 9f)),
+
+                // 5 - the combination the first four waves taught separately.
+                Wave(5, "Combined Arms", 30f,
+                     Entry(shambler, 0f, 10, SpawnPattern.Ring, 10f),
+                     Entry(runner, 9f, 8, SpawnPattern.Arc, 4f, 80f),
+                     Entry(brute, 16f, 2, SpawnPattern.Arc, 2f, 40f)),
+
+                // 6 - a breach: everything through one gap at once.
+                Wave(6, "Breach", 30f,
+                     Entry(runner, 0f, 12, SpawnPattern.Point, 5f),
+                     Entry(shambler, 6f, 12, SpawnPattern.Arc, 8f, 50f),
+                     Entry(brute, 18f, 2, SpawnPattern.Point, 1f)),
+
+                // 7 - second lull. Recover, and let the draft catch up.
+                Wave(7, "Regroup", 22f,
+                     Entry(shambler, 2f, 8, SpawnPattern.Ring, 12f)),
+
+                // 8 - the wall before the boss.
+                Wave(8, "The Wall", 34f,
+                     Entry(shambler, 0f, 14, SpawnPattern.Ring, 10f),
+                     Entry(runner, 7f, 12, SpawnPattern.Ring, 8f),
+                     Entry(brute, 14f, 4, SpawnPattern.Ring, 6f),
+                     Entry(runner, 24f, 10, SpawnPattern.Arc, 4f, 90f))
+            };
+        }
+
+        /// <summary>
+        /// The endless difficulty ramp.
+        ///
+        /// Waves 1-2 are Shamblers only: the player has to learn what one bullet
+        /// does before a second tier means anything. Runners arrive at wave 3
+        /// taking 40% of spawns; Brutes at wave 6. The Shambler absorbs the rest
+        /// and never drops below 20%, because it is the tier every other tier is
+        /// read against.
+        ///
+        /// Difficulty rises through composition and rate only — never HP. The
+        /// bullet ladder is a promise the game has to keep.
+        /// </summary>
+        static SpawnRamp BuildSpawnRamp(EnemyDefinition[] zombies)
+        {
+            SpawnRamp ramp = Asset<SpawnRamp>("SpawnRamp");
+
+            ramp.tiers = new[]
+            {
+                new SpawnRamp.TierRamp
+                {
+                    enemy = zombies[0],          // Shambler
+                    isBaseline = true,
+                    firstWave = 1
+                },
+                new SpawnRamp.TierRamp
+                {
+                    enemy = zombies[1],          // Runner
+                    firstWave = 3,
+                    rampEndWave = 10,
+                    shareAtFirstWave = 0.40f,
+                    shareAtRampEnd = 0.50f
+                },
+                new SpawnRamp.TierRamp
+                {
+                    enemy = zombies[2],          // Brute
+                    firstWave = 6,
+                    rampEndWave = 15,
+                    shareAtFirstWave = 0.08f,
+                    shareAtRampEnd = 0.25f
+                }
+            };
+
+            ramp.baselineMinimumShare = 0.20f;
+
+            // Interval carries the early ramp; once it floors out at wave 15 the
+            // burst size takes over, so pressure keeps rising without the spawn
+            // loop firing every other frame.
+            ramp.intervalAtWave1 = 1.40f;
+            ramp.intervalAtRampEnd = 0.35f;
+            ramp.intervalRampEndWave = 15;
+            ramp.minimumInterval = 0.25f;
+
+            // Burst only starts once the interval has bottomed out. Ramping both
+            // at once makes a staircase: a single burst step doubles the spawn
+            // rate in one wave, which reads as the game breaking, not hardening.
+            ramp.burstStartWave = 15;
+            ramp.burstAtStart = 1;
+            ramp.burstAtRampEnd = 3;
+            ramp.burstRampEndWave = 25;
+
+            EditorUtility.SetDirty(ramp);
+            return ramp;
+        }
+
+        /// <summary>
+        /// The ramp, and the wave at which it outpaces an un-upgraded player.
+        ///
+        /// Spawn rate on its own says nothing — what matters is spawn rate
+        /// against the rate the gun can clear, and that depends on the *mix*,
+        /// since a Brute costs six rounds and a Shambler one. The overrun wave is
+        /// where a player who drafted nothing starts losing ground, which is the
+        /// floor the upgrade curve has to beat.
+        /// </summary>
+        static void LogSpawnRamp(DataSet set)
+        {
+            const float BaseFireRate = 3f;              // StatSheet FireRate
+            float roundsPerMinute = BaseFireRate * 60f;
+
+            var sb = new System.Text.StringBuilder("[ScalePunch] Spawn ramp (level-driven)\n");
+            sb.Append(" level  interval  burst  spawn/min  clear/min  mix\n");
+
+            int overrunWave = 0;
+
+            foreach (int wave in new[] { 1, 2, 3, 5, 6, 10, 15, 20, 25 })
+            {
+                float interval = set.ramp.IntervalFor(wave);
+                int burst = set.ramp.BurstFor(wave);
+                float spawnsPerMinute = 60f / interval * burst;
+
+                float roundsPerKill = AverageBulletsPerKill(set, wave);
+                float clearsPerMinute = roundsPerKill <= 0f ? 0f : roundsPerMinute / roundsPerKill;
+
+                if (overrunWave == 0 && spawnsPerMinute > clearsPerMinute) overrunWave = wave;
+
+                sb.Append($"  {wave,4}  {interval,7:0.00}s {burst,5}  {spawnsPerMinute,9:0}  " +
+                          $"{clearsPerMinute,9:0}  {set.ramp.Describe(wave)}\n");
+            }
+
+            sb.Append(overrunWave > 0
+                ? $"  -> an un-upgraded player falls behind at level {overrunWave}. " +
+                  "Upgrades have to cover the gap from there."
+                : "  -> the base loadout keeps up at every sampled level; the ramp may be too soft.");
+
+            Debug.Log(sb.ToString());
+        }
+
+        /// <summary>Rounds per kill across the wave's mix, weighted by share.</summary>
+        static float AverageBulletsPerKill(DataSet set, int wave)
+        {
+            float claimed = 0f;
+            foreach (SpawnRamp.TierRamp tier in set.ramp.tiers)
+                if (tier != null && !tier.isBaseline) claimed += tier.ShareAt(wave);
+
+            float weighted = 0f;
+            float total = 0f;
+
+            foreach (SpawnRamp.TierRamp tier in set.ramp.tiers)
+            {
+                if (tier == null || tier.enemy == null) continue;
+
+                float share = tier.isBaseline
+                    ? Mathf.Max(set.ramp.baselineMinimumShare, 1f - claimed)
+                    : tier.ShareAt(wave);
+
+                if (share <= 0f) continue;
+
+                weighted += share * tier.enemy.BulletsToKill(BaseBulletDamage);
+                total += share;
+            }
+            return total <= 0f ? 1f : weighted / total;
+        }
+
+        static StageDefinition BuildStage(WaveDefinition[] waves, EnemyDefinition boss)
+        {
+            StageDefinition stage = Asset<StageDefinition>("Stage_01");
+
+            stage.id = "stage_01";
+            stage.displayName = "Stage 1";
+            stage.stageNumber = 1;
+            stage.waves = waves;
+            stage.boss = boss;
+            stage.bossIntroSeconds = 2.5f;
+            stage.hpMultiplier = 1f;
+            stage.damageMultiplier = 1f;
+            stage.coinsOnClear = 250;
+            stage.coinsPerKill = 2;
+            stage.failPayoutFraction = 0.35f;
+
+            EditorUtility.SetDirty(stage);
+            return stage;
         }
 
         // ----------------------------------------------------------- abilities
@@ -278,7 +651,7 @@ namespace ScalePunch.EditorTools
             return def;
         }
 
-        static AbilityLibrary BuildAbilities()
+        static AbilityLibrary BuildAbilities(PrototypeConfig prototype)
         {
             var burst     = Asset<RadialBurstEffect>("Effect_RadialBurst");
             var grenade   = Asset<GrenadeEffect>("Effect_Grenade");
@@ -288,8 +661,55 @@ namespace ScalePunch.EditorTools
             EditorUtility.SetDirty(grenade);
             EditorUtility.SetDirty(lightning);
 
-            var abilities = new List<AbilityDefinition>
-            {
+            List<AbilityDefinition> abilities = prototype.fullAbilityRoster
+                ? FullRoster(burst, grenade, lightning)
+                : PrototypeRoster(burst);
+
+            // Weight 0 keeps this out of the normal weighted draw; it is only ever
+            // reached through the library's explicit fallback slot, when every
+            // owned ability is maxed.
+            AbilityDefinition patch = Passive("Ability_Patch", "Field Dressing",
+                StatType.MaxHP, ModifierKind.Flat, 20f, 99, 0f, "max HP");
+
+            AbilityLibrary library = Asset<AbilityLibrary>("AbilityLibrary");
+            library.abilities = abilities;
+            library.fallback = patch;
+
+            // Prototype: every ability is draftable, so a run sees the whole pool
+            // rather than being forced into a build out of three options.
+            library.maxDistinctAbilities = prototype.fullAbilityRoster ? 6 : abilities.Count;
+
+            EditorUtility.SetDirty(library);
+            return library;
+        }
+
+        /// <summary>
+        /// Three abilities, three levels: one active so something visibly
+        /// happens, and two passives whose effect is unmistakable. Enough to
+        /// answer whether the draft is worth interrupting a run for, and no more.
+        /// </summary>
+        static List<AbilityDefinition> PrototypeRoster(RadialBurstEffect burst) => new()
+        {
+            Active("Ability_Shockwave", "Shockwave", burst,
+                new[] { 6.0f, 5.0f, 4.0f },
+                new[] { 1.2f, 1.8f, 2.5f },
+                new[] { 4.0f, 5.0f, 6.0f },
+                new[] { 0, 0, 0 },
+                new[]
+                {
+                    "Blast 120% damage in 4 m, every 6 s",
+                    "Blast 180% damage in 5 m, every 5 s",
+                    "Blast 250% damage in 6 m, every 4 s"
+                },
+                1.0f),
+
+            Passive("Ability_Damage",   "Heavy Rounds", StatType.Damage,   ModifierKind.Percent, 0.15f, 3, 1.0f, "damage"),
+            Passive("Ability_FireRate", "Trigger Work", StatType.FireRate, ModifierKind.Percent, 0.12f, 3, 1.0f, "fire rate")
+        };
+
+        static List<AbilityDefinition> FullRoster(RadialBurstEffect burst, GrenadeEffect grenade,
+                                                  ChainLightningEffect lightning) => new()
+        {
                 Active("Ability_Shockwave", "Shockwave", burst,
                     new[] { 6.0f, 5.5f, 5.0f, 4.5f, 4.0f },
                     new[] { 1.2f, 1.5f, 1.8f, 2.1f, 2.5f },
@@ -344,21 +764,6 @@ namespace ScalePunch.EditorTools
                 // every other stat and is the one upgrade a player can literally
                 // see working - common range cards flatten the difficulty curve.
                 Passive("Ability_Range",     "Long Sight",   StatType.Range,           ModifierKind.Flat,    1f,    5, 0.4f, "m radius")
-            };
-
-            // Weight 0 keeps this out of the normal weighted draw; it is only ever
-            // reached through the library's explicit fallback slot, when every
-            // owned ability is maxed.
-            AbilityDefinition patch = Passive("Ability_Patch", "Field Dressing",
-                StatType.MaxHP, ModifierKind.Flat, 20f, 99, 0f, "max HP");
-
-            AbilityLibrary library = Asset<AbilityLibrary>("AbilityLibrary");
-            library.abilities = abilities;
-            library.fallback = patch;
-            library.maxDistinctAbilities = 6;
-
-            EditorUtility.SetDirty(library);
-            return library;
-        }
+        };
     }
 }

@@ -48,6 +48,18 @@ namespace ScalePunch.Core
             Apply();
         }
 
+        /// <summary>
+        /// Drops every pause and freeze and restores normal time. Called before a
+        /// scene reload: a restart pressed from a paused run-end screen would
+        /// otherwise load the next scene with timeScale still at zero.
+        /// </summary>
+        public void ResetAll()
+        {
+            _pauseDepth = 0;
+            _freezeRemaining = 0f;
+            Time.timeScale = 1f;
+        }
+
         void Update()
         {
             if (_freezeRemaining <= 0f) return;

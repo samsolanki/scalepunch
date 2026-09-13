@@ -49,6 +49,13 @@ namespace ScalePunch.UI
         {
             base.Awake();
 
+            if (!Core.PrototypeConfig.Active.healthBars)
+            {
+                enabled = false;
+                return;
+            }
+
+
             if (worldCamera == null) worldCamera = Camera.main;
 
             _poolRoot = new GameObject("~HealthBarPool").transform;

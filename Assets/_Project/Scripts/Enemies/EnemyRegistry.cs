@@ -37,11 +37,16 @@ namespace ScalePunch.Enemies
 
         /// <summary>Scene teardown — statics outlive scene loads, so the Run
         /// scene must clear this or the next run starts with ghosts.</summary>
-        public static void Clear()
-        {
-            Active.Clear();
-            Killed = null;   // statics outlive scene loads; stale subscribers would leak
-        }
+        /// <summary>
+        /// Scene teardown. Clears the roster only — NOT the Killed subscribers.
+        ///
+        /// Nulling the event here was an ordering bug: Unity does not define
+        /// whether a listener's OnEnable runs before or after the spawner's
+        /// Awake, so a subscriber that happened to register first had its
+        /// subscription silently wiped and its counter stayed at zero forever.
+        /// Subscribers unsubscribe in OnDisable, which is deterministic.
+        /// </summary>
+        public static void Clear() => Active.Clear();
 
         public static Enemy FindNearest(Vector3 position, float maxDistance)
         {
@@ -75,7 +80,6 @@ namespace ScalePunch.Enemies
         public static Enemy FindFirstAlongSegment(Vector3 from, Vector3 to, float radius,
                                                   List<Enemy> ignore = null)
         {
-            float radiusSqr = radius * radius;
             float bestT = float.MaxValue;
             Enemy best = null;
 
@@ -85,8 +89,14 @@ namespace ScalePunch.Enemies
                 if (e == null || e.IsDead) continue;
                 if (ignore != null && ignore.Contains(e)) continue;
 
+                // The round's radius PLUS the target's own, which is a sphere-vs-
+                // capsule sweep rather than a point test against a fixed number.
+                // A single flat radius is only ever right for one tier, and every
+                // other tier either eats phantom hits or shrugs off real ones.
+                float reach = radius + e.BodyRadius;
+
                 float sqr = SqrDistanceToSegment(e.transform.position, from, to, out float t);
-                if (sqr > radiusSqr || t >= bestT) continue;
+                if (sqr > reach * reach || t >= bestT) continue;
 
                 bestT = t;
                 best = e;

@@ -1,315 +1,365 @@
-# Current State — what actually exists
+# Current State & Backlog
 
-Written after the M1 commit. **43 scripts, ~3,300 lines.**
-
-This document separates three very different things, because conflating them is
-how projects convince themselves they are further along than they are:
+Rewritten after the Unity project landed. **48 runtime scripts, 4 editor
+scripts, 19 data assets, 6 prefabs, one playable scene.**
 
 | Mark | Meaning |
 |---|---|
-| **BUILT** | Code exists in `Assets/_Project/Scripts/`. Not compiled against a Unity install yet — no Unity in the environment these were written in. |
-| **DESIGNED** | Specified in the docs. No code. |
-| **NOT PLANNED** | Does not exist in the design, deliberately or otherwise. |
-
-Nothing here has been run. There is no Unity project yet — only scripts and the
-setup guides for wiring them up (`05-m0-setup.md`, `06-m1-setup.md`).
+| **BUILT** | Exists and is wired into `Run.unity` |
+| **DESIGNED** | Specified in the docs. No code |
+| **NOT PLANNED** | Not in the design, deliberately or otherwise |
 
 ---
 
 ## 1. What the game is
 
 A **stationary zombie-defence roguelite**. The player is a fixed emplacement
-that never moves. Zombies converge from all directions; anything crossing the
-player's engagement radius is acquired and shot automatically. There is no
-movement input, no aiming input, and no fire button.
+with an engagement radius. Zombies converge from every direction; anything
+crossing the ring is acquired and shot automatically. No movement input, no
+aiming input, no fire button. Every level-up pauses the run for a choice of
+three cards — the only interaction a run has.
 
-Every 20-ish seconds you level up, the run pauses, and you pick one of three
-upgrade cards. That draft is the **only** interaction a run has.
+## 2. Prototype mode
 
----
+The project is currently a **prototype**. Most systems are written and
+compiling but switched off at `Assets/_Project/Data/PrototypeConfig.asset`.
 
-## 2. System status at a glance
+Toggles rather than commented-out code, deliberately: commenting a system out
+across dozens of files makes re-enabling a merge exercise, and code that does
+not compile while disabled rots silently against every change made around it.
 
-| System | Status | Notes |
+| Toggle | Now | On means |
 |---|---|---|
-| Player emplacement | **BUILT** | One player. No characters, no classes |
-| Auto-targeting + shooting | **BUILT** | 4 target priorities, HUD toggle |
-| Projectiles | **BUILT** | Pooled, swept hits, pierce, spread, soft homing |
-| Zombies | **BUILT** | 1 behaviour coded, 3 stat variants specced |
-| Damage / crit / knockback | **BUILT** | Single crit path via `DamageDealer` |
-| Feel (hitstop, shake, flash, numbers) | **BUILT** | All tunable from one asset |
-| XP + levelling | **BUILT** | Gems, magnet, quadratic curve |
-| Ability draft | **BUILT** | Weighted offer, 8 abilities specced |
-| Ability effects | **BUILT** | 3 actives coded |
-| Run HUD | **BUILT** | XP, health, timer, kills, priority |
-| Waves / stages | **DESIGNED** | Spawner still ramps on a plain timer |
-| Boss | **DESIGNED** | No code |
-| Run end (win/lose) | **DESIGNED** | **Player death currently does nothing** |
-| Currencies | **DESIGNED** | Zero code |
-| Gear | **DESIGNED** | Zero code |
-| Base / idle rooms | **DESIGNED** | Zero code |
-| Save / load | **DESIGNED** | Zero code — nothing persists |
-| Rewards | **DESIGNED** | Zero code |
-| Ads / IAP / analytics | **DESIGNED** | Zero code (M4) |
-| **Energy system** | **NOT PLANNED** | Deliberately rejected — see §8 |
-| **Skill tree** | **NOT PLANNED** | Not in the design at all — see §9 |
+| `waves` | **off** | Authored 8-wave Stage_01 instead of an endless timer |
+| `boss` | **off** | Two-phase boss after the last wave |
+| `runEndScreen` | **off** | Victory/defeat screen; off = death restarts the run |
+| `abilityRarity` | **off** | Five rarity tiers scaling card magnitude |
+| `saveAndCurrency` | **off** | Coins bank and a profile is written to disk |
+| `healthBars` | **off** | Floating bars over zombies |
+| `fullAbilityRoster` | **off** | 8 abilities × 5 levels instead of 3 × 3 |
 
----
+`fullAbilityRoster` is read by `RunSceneBuilder` when authoring assets, so
+changing it needs a rebuild — the rest take effect on the next play.
 
-## 3. The player
+`GameBootstrap` publishes the config at `DefaultExecutionOrder(-10000)`, because
+half the scene checks a toggle in its own `Awake` and Unity does not define the
+order those run in.
 
-**One player. No character select, no classes, no unlockable heroes.**
+### The bullet ladder
 
-It is a `GameObject` carrying `Health`, `PlayerStats`, `AutoShoot`,
-`LevelSystem`, `AbilitySystem` and `DraftController`. It has a turret child that
-rotates to face its target, and a ring on the ground showing its radius.
+Every zombie's HP is **derived from the player's base damage**, so tiers are
+authored as "dies in N bullets" rather than as raw HP:
 
-### The stat block (all 15 stats — BUILT)
+| Tier | HP | Bullets | Time to kill | Speed |
+|---|---|---|---|---|
+| Shambler | 5 | **1** | 0.33 s | 2.5 |
+| Runner | 10 | **2** | 0.67 s | 4.5 |
+| Brute | 30 | **6** | 2.00 s | 1.4 |
+| Boss | 200 | **40** | 13.3 s | 1.6 |
 
-| Stat | Base | Read by |
-|---|---|---|
-| `MaxHP` | 100 | Health |
-| `Damage` | 10 | Every damage source |
-| `FireRate` | 3.0 /sec | AutoShoot |
-| `Range` | 9.0 m | **The radius.** AutoShoot, RangeIndicator |
-| `ProjectileSpeed` | 30 m/s | Projectile |
-| `ProjectileCount` | 1 | AutoShoot (fractions roll for the extra round) |
-| `Pierce` | 0 | Projectile |
-| `CritChance` | 0.05 | DamageDealer, rolled **per round** |
-| `CritMultiplier` | 2.0 | DamageDealer |
-| `Lifesteal` | 0 | Projectile, heals at impact |
-| `PickupRadius` | 1.5 | XPGemService magnet |
-| `CooldownReduction` | 0 | AbilitySystem |
-| `Armor` | 0 | **Declared, nothing reads it** |
-| `Luck` | 0 | DraftController novelty bias only |
-| `MoveSpeed` | — | **Reserved. The player does not move** |
+At the base fire rate of 3/s, before any upgrades. `StatSheet.BaseDamage` is
+the single anchor — the builder reads it rather than keeping a copy, so
+changing damage moves every tier together instead of silently breaking the
+ladder.
 
-Modifiers are flat or percent, and **percent bonuses are additive with each
-other on purpose** — multiplicative stacking makes the economy explode by
-stage 6 and cannot be walked back after launch.
+**Per-wave HP scaling is off** (`hpGrowthPerWave = 1`). With it on, a Shambler
+needed two bullets twenty seconds into every run, and nothing announced that the
+baseline had moved. Difficulty in the prototype comes from spawn rate alone.
 
----
+**Armour is 0 on everything with a countable bullet budget.** Armour and "dies
+in exactly N bullets" pull against each other: at armour 1 a 5-damage round
+lands 4, so a 30 HP Brute becomes eight shots rather than six. The Brute's
+identity is knockback immunity instead.
 
-## 4. Weapons
+The builder prints the ladder at wave 0 and wave 8 on every rebuild. If those
+two columns disagree, scaling is on and the ladder is a wave-0 promise the game
+stops keeping.
 
-**The system is BUILT. The roster is not.**
+### Why rounds used to miss
 
-`WeaponDefinition` is a ScriptableObject holding *multipliers over the player's
-stat sheet*, never absolute numbers — so a pistol and a minigun scale off one
-upgrade tree instead of needing parallel balance passes.
+Three independent faults, all of which had to be fixed for "one bullet, one
+Shambler" to hold in practice rather than only on paper:
 
-What a weapon controls: damage / fire-rate / range / projectile-speed
-multipliers, extra projectiles, spread cone, inaccuracy, homing steer rate,
-hit radius, projectile lifetime, and which projectile prefab it uses.
-
-**Weapon assets authored so far: one** (`Weapon_Pistol`, all multipliers at 1).
-
-The system already supports a shotgun (high `extraProjectiles`, wide
-`spreadDegrees`), a minigun (high fire rate, high inaccuracy), a railgun (high
-pierce, slow fire) with **no code changes** — they are just assets nobody has
-created yet.
-
-There is no weapon switching, no weapon unlocking, and no weapon UI.
-
----
-
-## 5. Zombies
-
-**One behaviour is coded: walk at the player, attack when in reach.**
-
-`EnemyMovement` handles chase, decaying knockback, sampled crowd separation, and
-a melee attack on an interval. It is transform-driven with no Rigidbody — 150
-rigidbodies is roughly the difference between 60 and 25 fps on mid-range
-Android.
-
-### Specced for M0/M1 — three assets sharing one prefab, differing only by stats
-
-| Type | HP | Speed | Note |
-|---|---|---|---|
-| Shambler | 20 | 2.5 | Filler |
-| Runner | 10 | 4.5 | Punishes low fire rate |
-| Brute | 90 | 1.4 | Knockback-immune |
-
-`EnemyBehaviour` also declares **Spitter**, which needs ranged-attack code that
-does not exist yet.
-
-### DESIGNED but not built — five more
-
-Spitter (outranges you), Bomber (explodes on death), Swarm (packs of 12), Elite
-(buffs neighbours), Boss (multi-phase).
-
-The design rule: **each type exists to make one upgrade line matter.** Spitters
-sell range, Runners sell fire rate, Swarms sell pierce, Brutes sell raw damage.
-An enemy that sells no upgrade is just more of the same enemy.
-
-Scaling is `hp = baseHP * 1.12^wave * stageMultiplier`.
-
----
-
-## 6. Abilities
-
-**8 specced for M1 — 3 active, 5 passive.** The design calls for 25-30 at v1.
-
-Each has 5 levels. On level-up you are offered 3 cards.
-
-### Actives — effect code BUILT
-
-| Ability | What it does |
+| Fault | Cost |
 |---|---|
-| **Shockwave** | Instant damage + knockback around you. The panic button |
-| **Frag Grenade** | Lobs at the **densest cluster**, not the nearest zombie, with a visible fuse |
-| **Chain Lightning** | Arcs between zombies, damage decaying per hop |
+| Aimed at the target's **current** position | A Runner moves 0.90 m during a 9 m flight; the hit radius is 0.55 m |
+| Firing arc was a flat **12°** | 1.91 m of allowed lateral error at 9 m, against a target 0.55 m wide |
+| Target stickiness let a zombie sit at **9.65 m** while rounds expire at 9 m | Every shot at a drifted target died 0.65 m short |
 
-Actives fire automatically on a cooldown. An `AbilityEffect` is an abstract
-ScriptableObject, so **a new active is one asset plus a small class** — never a
-change to `AbilitySystem`.
+Two more surfaced only after those were fixed, because each was a system that
+was correct on its own:
 
-### Passives — pure stat modifiers
+| Fault | Cost |
+|---|---|
+| The round's homing steered toward the target's **current** position | Pursuit guidance, running every frame, erasing the turret's lead a frame at a time |
+| Aim was solved from the **muzzle**, 1.16 m out along the barrel | Zombies attack from 1.4 m; once inside that the muzzle-to-target vector flips and the turret whips 180° |
 
-`+15% damage`, `+12% fire rate`, `+1 pierce`, `+0.5 rounds/shot`, `+1 m radius`.
+Now: one shared `Ballistics.Intercept` serves the turret *and* the round, so the
+two cannot disagree; the round re-solves its intercept as it flies rather than
+chasing where the target stood; aim is solved about the turret **pivot** with the
+round merely *spawning* at the barrel tip; the firing arc is the target's angular
+size plus half of what the round can steer out; and it holds fire when the
+intercept falls outside the ring.
 
-`+1 m radius` is deliberately the **rarest card in the pool** (draft weight 0.4
-against 1.2 for damage). Radius compounds with every other stat and is the one
-upgrade a player can literally see working; common range cards flatten the
-entire difficulty curve.
+### Guaranteed hit
 
-### Draft rules — BUILT
+`Weapon_Pistol.guaranteedHit` is **on**: every round that leaves the barrel
+reaches its target.
 
-- Maxed abilities are never offered.
-- If you hold no active by your second draft, one is **forced** into the offer —
-  a run with only `+damage` cards has nothing happening in it.
-- Distinct abilities are capped (set 6). Without a cap you end every run holding
-  everything and no two runs differ.
-- Level-ups **queue**: one big gem can grant two levels, and each owes a draft.
-- `Luck` biases slightly toward abilities you do not yet own.
+It is not a cheat — it is a lock-on. Pursuit converges whenever the chaser is
+faster than the target, and the round is 45 m/s against 4.5, a 10:1 advantage.
+The only other requirement is turning fast enough to hold the line of sight:
 
-### Evolutions — DESIGNED, hooks only
-
-`evolvesInto` / `evolutionRequires` exist on `AbilityDefinition` and the draft
-already skips assets flagged `isEvolution`, but **nothing unlocks them**. M3.
-
----
-
-## 7. XP system — BUILT
-
-The full chain works:
-
-```
-zombie dies
-  -> XPGemService.Drop() pools a gem at the corpse
-  -> gem scatters briefly with decaying velocity
-  -> once inside PickupRadius it LATCHES and accelerates in
-     (latching, not per-frame: a gem already flying must never stall)
-  -> on contact, LevelSystem.AddXP(value)
-  -> while (xp >= needed) { level++; raise LevelledUp }
-  -> DraftController queues a draft per level
-  -> TimeController.PushPause(), three cards appear
-```
-
-**Curve:** `cost(n) = 5 + 8n + 0.5n²`, soft-capped at level 40 so long runs do
-not stall completely. Target: first draft within 25 seconds of run 1.
-
-**Gem cap:** 200 concurrent. Past that, value is folded into a live gem rather
-than dropped — XP is never silently lost, the drop just is not rendered.
-
----
-
-## 8. Energy system — NOT PLANNED, deliberately
-
-**There is no energy or stamina system, and the design argues against adding
-one** (`docs/01-game-design.md` §9).
-
-Energy caps session length in a genre that lives on long sessions. It is the
-single most common reason clones of this game fail their soft launch: it
-throttles exactly the players who are most engaged, and the revenue it protects
-is smaller than the retention it costs.
-
-**Progress is gated by stage difficulty instead** — you replay a stage because
-you are not strong enough for it yet, not because a meter is empty.
-
-If you want energy anyway, say so and I will spec it — but I would push back
-once first.
-
----
-
-## 9. Skill tree — NOT PLANNED
-
-**There is no skill tree in this design.** Nothing in the code or the docs
-implements one. Progression is split across two layers instead:
-
-| Layer | Lifetime | Status |
+| Closing to | Line of sight swings at | Lock-on turns at |
 |---|---|---|
-| **Ability draft** | One run. Reset every run | **BUILT** |
-| **Base rooms** | Permanent, across all runs | **DESIGNED**, zero code |
+| 9 m | 29°/s | 720°/s |
+| 2 m | 129°/s | 720°/s |
+| 0.55 m (hit radius) | 469°/s | 720°/s |
 
-The base rooms are the closest thing to a permanent upgrade tree:
+The round reaches the hit radius long before the line outruns it. Two other
+things had to give for the guarantee to hold: a guaranteed round **ignores range
+expiry while its target is alive** (the range gate decides what the gun engages,
+and the target was inside it when the trigger went), and a round whose target
+dies mid-flight **retargets** to the nearest zombie within 4 m rather than
+sailing into empty floor.
 
-| Room | Effect | Cost curve |
+**What it costs.** `ProjectileSpeed` no longer affects whether you hit — it is
+now purely how fast the tracer looks. And a spread weapon's pellets would all
+converge on one zombie instead of covering an arc, so a future shotgun should
+turn this off. That is why the flag lives on the weapon and not on the player.
+
+`WeaponTelemetry` logs every 50 rounds and separates the two cases that used to
+look identical: **missed** (expired with a live target still out there — a real
+aiming failure) and **wasted** (the target died first — not a miss). With
+guaranteed hit on, missed should read 0. Anything above that is a bug, not
+variance.
+
+Rounds **reserve their damage** against the target while in flight. That
+reservation is a **preference, not an exclusion**:
+
+- The current target is never dropped for being doomed — the engagement finishes.
+- Target selection prefers a non-doomed zombie but falls back to a doomed one
+  rather than returning nothing.
+
+Both rules exist because the strict version broke exactly one tier. A Shambler
+has 5 HP and a round carries 5 damage, so a single round in the air marked it
+dead-on-arrival, the turret stopped tracking it, and if that round then missed
+the Shambler walked in unengaged until it expired. Nothing above 5 HP could
+reproduce it, which is why it looked like a level-1 problem.
+
+It also bought nothing: at a 0.33 s fire interval against a 0.20 s flight time,
+only one round is ever airborne, so overkill was not possible in the first place.
+The reservation stays for when fire rate climbs past flight time.
+
+### One progression: "Level"
+
+There is a single number. It rises on kills, and it drives **both** the ability
+draft and the spawn ramp.
+
+Before, a "level" advanced on kills while a "wave" advanced on a 20-second
+clock. Two progressions, two names, two bars — and the player had no way to tell
+which one was making the game harder. They are the same thing now, shown once,
+on the top track.
+
+Driving difficulty from kills rather than the clock also makes the ramp
+**self-balancing**: a player clearing fast earns harder levels, and one who is
+struggling is not buried by a timer that does not care how they are doing.
+
+| Level | Reached at | What changes |
 |---|---|---|
-| Armoury | +2% damage/level | `100 * 1.18^n` |
-| Infirmary | +2% max HP/level | `100 * 1.18^n` |
-| Radar | +0.15 m radius/level | `150 * 1.20^n` |
-| Workshop | +1.5% fire rate/level | `150 * 1.20^n` |
-| Vault | Offline coin income | `200 * 1.22^n` |
-| Forge / Lab | Unlock gear tiers, ability rerolls | Milestone |
+| 1-2 | 0 / 5 kills | Shamblers only |
+| 3 | 15 kills | Runners enter at 40% |
+| 6 | 105 kills | Brutes enter at 8% |
+| 10 | 275 kills | Runners 50%, Brutes 16% |
+| 15 | — | Spawn interval floors; burst takes over |
 
-That is a **flat list of upgradeable rooms**, not a branching tree — no
-prerequisites, no mutually exclusive paths, no respec. It is the standard shape
-for this genre because it is legible on a phone screen.
+### The spawn ramp
 
-If you want a real branching skill tree with exclusive paths, that is a design
-change, not a missing feature. Worth deciding before the meta layer is built,
-because it changes the save format.
+Difficulty comes from **composition and rate, never HP**. The bullet ladder is a
+fixed promise, so a harder level means more zombies and tougher *kinds*, not the
+same zombie with more health.
+
+| Level | Interval | Burst | Spawns/min | Clear/min | Mix |
+|---|---|---|---|---|---|
+| 1-2 | 1.40s | 1 | 43 | 180 | Shambler 100% |
+| 3 | 1.25s | 1 | 48 | 129 | Shambler 60%, **Runner 40%** |
+| 6 | 1.02s | 1 | 59 | 98 | Shambler 48%, Runner 44%, **Brute 8%** |
+| 10 | 0.72s | 1 | 83 | 79 | Shambler 34%, Runner 50%, Brute 16% |
+| 15 | 0.35s | 1 | 171 | 65 | Shambler 25%, Runner 50%, Brute 25% |
+| 20 | 0.35s | 2 | 343 | 65 | steady |
+| 25 | 0.35s | 3 | 514 | 65 | steady |
+
+*Clear/min* is what an **un-upgraded** player can kill, from fire rate against
+the mix's weighted bullets-per-kill. The crossover is **level 10** — from
+there, upgrades have to cover the gap. That is the floor the draft has to beat,
+and the number to watch when tuning either side.
+
+Two rules the shape depends on:
+
+- **Levels 1-2 are Shamblers only.** A second tier means nothing until the player
+  knows what one bullet does.
+- **Interval and burst never ramp at once.** Interval carries levels 1-15; burst
+  only starts once it floors. A burst step is an integer, so overlapping them
+  roughly doubles the spawn rate in a single level — a staircase that reads as the
+  game breaking rather than hardening. `SpawnRamp.OnValidate` warns if they
+  overlap.
+
+Authored in `SpawnRamp.asset`; the builder prints the whole table on rebuild.
+
+### What the prototype actually is
+
+Stationary player, auto-fire, zombies arriving forever on an accelerating timer.
+A draft at 5 kills, another at 15, then 30/50/75. Three abilities, three levels
+each: Shockwave, Heavy Rounds, Trigger Work. Death restarts. Nothing persists.
+
+That is the thing being tested. If holding the ring is not fun at this size, no
+toggle on the list above changes the answer.
+
+## 2b. Status
+
+| System | Status |
+|---|---|
+| Unity 6 project, URP mobile | **BUILT** |
+| `RunSceneBuilder` — generates scene, prefabs, materials, data | **BUILT** |
+| Auto-targeting + shooting, 4 priorities | **BUILT** |
+| Projectiles: pooled, swept hits, pierce, spread, homing | **BUILT** |
+| Zombies: chase, melee, knockback, separation | **BUILT** |
+| Armour, crit, lifesteal | **BUILT** |
+| Feel: hitstop, shake, flash, flinch, muzzle flash, damage numbers | **BUILT** |
+| Floating health bars (pooled, one canvas) | **BUILT** |
+| XP, gems, magnet, levelling | **BUILT** |
+| Ability draft, 8 abilities, 3 active effects | **BUILT** |
+| Draft rarity (5 tiers) + before/after card values | **BUILT** |
+| Kill-triggered drafts (5, 15, 30, …) | **BUILT** |
+| Run HUD: top level track (kill slider + level badge + total kills), bottom bar with health and boosters | **BUILT** |
+| Booster slots showing active abilities + cooldown sweep | **BUILT** |
+| Waves / stages | **BUILT** — 8 authored waves, ~3:30 |
+| Boss | **BUILT** — two phases, telegraphed charge |
+| Run end (win/lose) | **BUILT** — end screen, payout, retry |
+| **Audio** | **DESIGNED** — *no audio system exists at all* |
+| Currencies (coins/gems/scrap) | **BUILT** — no sink until P6 |
+| Save / load + migrations | **BUILT** — local only, no cloud save |
+| Gear, base rooms | **DESIGNED** — zero code |
+| Ads / IAP / analytics | **DESIGNED** — M4 |
+| Energy system | **NOT PLANNED** — rejected, see §5 |
+| Skill tree | **NOT PLANNED** — see §5 |
 
 ---
 
-## 10. Rewards — DESIGNED, zero code
+## 3. The backlog, in the order it should be done
 
-**Nothing pays out yet. The player dies and nothing happens** — no screen, no
-currency, no drop, no save.
+### P0 — Repo correctness (~30 min)
 
-The full designed economy (`docs/01-game-design.md` §7-9):
+The project currently contradicts itself.
 
-| Currency | Earned from | Spent on |
-|---|---|---|
-| Coins | Runs, offline Vault | Base rooms, gear levels |
-| Gems | IAP, first clears, dailies | Chests, revives, speedups |
-| Scrap | Salvaging gear | Gear upgrades |
+- [ ] **Stale data assets.** `Zombie_Brute.asset` holds 90 HP / armour 2;
+      `RunSceneBuilder.Data.cs` writes 10 HP / armour 0. The scene loads the
+      asset, so the repo does not behave the way the last commit says. Re-run
+      `ScalePunch/Build Run Scene` and commit.
+- [ ] **Two sources of truth for balance.** The `.asset` files and the builder
+      both claim to own the numbers, which is what produced the item above.
+      Pick one: gitignore generated assets and let the builder own balance, or
+      make the builder a one-time bootstrap and let the assets own it. Both is
+      the state that keeps regenerating this bug.
+- [ ] **Zombie tiers are flattened.** All three are effectively 10 HP. A Brute
+      with 10 HP, no armour and knockback immunity is a slow large Shambler.
+      Fine while debugging "does the gun work"; meaningless for tuning.
+- [ ] Delete `Assets/NewMonoBehaviourScript.cs` (Unity template leftover).
+- [ ] Duplicate `<summary>` tag on `SqrDistanceToSegment`.
 
-**Gear:** 6 slots (Weapon, Barrel, Magazine, Scope, Armour, Rig), 5 rarities,
-random affixes, level-up with coins + scrap, fuse 3 duplicates into the next
-rarity.
+### P1 — The run lifecycle — **DONE**
 
-**Offline income:** the Vault accrues coins while away, capped at 8 hours — that
-cap is what forces the daily return.
+- [x] `WaveDefinition` / `StageDefinition` timelines replacing the timer ramp
+- [x] One boss with two phases and a telegraphed charge
+- [x] Victory and defeat screens with a reward summary
+- [x] Restart flow
+- [x] Failed runs pay out at a reduced rate (`failPayoutFraction`, default 0.35)
 
-Failed runs must still pay out, at a reduced rate. Never send a player away
-empty-handed.
+Still open from P1: **return-to-meta** has nowhere to return to until P2 builds
+a meta scene, and the payout is **computed and displayed but not banked** —
+`RunController.Payout()` is the seam a `CurrencyService` plugs into.
+
+### P2 — Persistence and rewards — **DONE**
+
+- [x] `CurrencyService`: coins, gems, scrap, all through Earn/Spend with
+      analytics-ready reason tags
+- [x] Run payout banked on win and loss, written to disk immediately
+- [x] `SaveService`: versioned JSON, atomic writes, one backup, checksummed,
+      **with the migrations chain in place from day one**
+- [x] Editor tools for wiping and inspecting the profile
+- [ ] **Cloud save** — needs Google Play Games / Firebase; moved to M4 with the
+      rest of the SDK work. Must ship before launch
+
+See [`docs/07-save-and-currency.md`](07-save-and-currency.md). Coins have no
+sink until P6, so do not tune `coinsOnClear` seriously yet.
+
+### P3 — Audio (nothing exists)
+
+Disproportionate return for the effort. In a shooter, sound is most of what
+sells the gun.
+
+- [ ] Pooled `AudioService` (never `PlayOneShot` on 40 concurrent impacts)
+- [ ] Fire layers with pitch variation, impact, zombie death, level-up sting,
+      low-health warning, UI clicks
+- [ ] Music with a wave-intensity layer
+
+### P4 — De-risk the core design question (cheap, do it early)
+
+- [ ] One manually triggered ability on a cooldown — a grenade button or a
+      barricade
+
+With a stationary player and automatic fire there is **no moment-to-moment
+input**. If testers say runs feel like *watching*, this is the fix, and it is
+far cheaper to try now than after 30 stages exist.
+
+### P5 — Content breadth
+
+- [ ] **Weapon roster.** Shotgun, minigun, railgun are *pure data* — the
+      multiplier system already supports them with zero code changes. Highest
+      variety-per-hour in the project
+- [ ] Spitter (needs ranged-attack code), Bomber, Swarm, Elite
+- [ ] Abilities from 8 to 25-30
+- [ ] Evolutions — hooks exist on `AbilityDefinition`, nothing unlocks them
+- [ ] 30 stages across 3 chapters
+
+### P6 — Meta layer
+
+- [ ] Gear: 6 slots, 5 rarities, affixes, levelling, duplicate fusion
+- [ ] Base rooms + offline Vault income, 8-hour cap
+- [ ] Daily missions, login rewards
+
+### P7 — Business layer (M4)
+
+- [ ] Ad mediation, IAP, analytics, remote config, Crashlytics, consent flow
 
 ---
 
-## 11. What is missing before this is a game
+## 4. Worth doing that is not on the roadmap
 
-In the order it should be built:
+- **Extend `RunSceneBuilder` to author waves and stages.** It already generates
+  every other asset; wave timelines are the next thing that would otherwise be
+  hand-built and un-diffable.
+- **A headless balance harness.** Simulate N runs, log time-to-kill per tier and
+  DPS per build, and print a table. In a game whose entire quality is a balance
+  curve, being able to answer "did that change help?" without playing for twenty
+  minutes pays for itself in a week.
+- **Editor validation pass.** One menu item that asserts every definition has a
+  prefab, every ability has five levels, no draft weight is zero by accident.
+  Catches the class of bug that only shows up ten minutes into a run.
 
-1. **Run lifecycle** — waves from a timeline, a boss, and win/lose screens.
-   Right now a run has no beginning, no end, and no consequence.
-2. **Rewards + save** — currencies, a run payout, and persistence. Without
-   these, closing the app erases everything and there is no reason to return.
-3. **Gear + base rooms** — the permanent progression layer.
-4. **Content** — more zombies, more abilities, more weapons, more stages.
-5. **Business layer** — ads, IAP, analytics (M4).
+## 5. Two standing design decisions
 
-Step 1 is the gap that matters most. Everything after it is meaningless until a
-run can be won or lost.
+**No energy system, deliberately.** It caps session length in a genre that lives
+on long sessions and throttles the most engaged players. Progress is gated by
+stage difficulty instead. (`docs/01-game-design.md` §9)
 
-## 12. One open design risk
+**No skill tree.** Progression is the in-run ability draft plus a flat list of
+upgradeable base rooms — no prerequisites, no exclusive paths, no respec. That
+is the genre standard because it stays legible on a phone. A branching tree is a
+design change, and it changes the save format, so decide before P2.
 
-With a stationary player and fully automatic fire, **a run has no
-moment-to-moment input** — the draft is the entire interaction. That makes this
-an idle defence game rather than an action roguelite. That is a legitimate genre
-and it fits the idle base meta, but it must be designed for deliberately.
+## 6. Note on the setup guides
 
-If playtesters describe runs as *watching* rather than *playing*, the fix is one
-manually triggered ability on a cooldown — a grenade button, a barricade — not
-more passive content. One button converts watching into playing.
+`05-m0-setup.md` and `06-m1-setup.md` describe wiring the scene by hand.
+`RunSceneBuilder` now does that from a menu item. Keep them as a reference for
+what the scene *contains*, but the builder is how it gets made.

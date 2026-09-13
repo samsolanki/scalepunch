@@ -1,7 +1,7 @@
 using UnityEngine;
+using ScalePunch.Combat;
 using ScalePunch.Enemies;
 using ScalePunch.Player;
-using ScalePunch.Weapons;
 
 namespace ScalePunch.Diagnostics
 {
@@ -54,9 +54,8 @@ namespace ScalePunch.Diagnostics
 
         void Start()
         {
-            Projectile.TotalHits = 0;
-            Projectile.TotalMisses = 0;
-
+            // Deliberately does not reset WeaponTelemetry - that is owned by the
+            // run, and zeroing it here would wipe counts the run is relying on.
             _weapon = FindAnyObjectByType<AutoShoot>();
 
             if (_weapon == null)
@@ -100,9 +99,9 @@ namespace ScalePunch.Diagnostics
                 : $"{_weapon.CurrentTarget.Definition?.id} @{Vector3.Distance(_weapon.transform.position, _weapon.CurrentTarget.transform.position):0.#}m";
 
             int shotsThisSecond = _shots - _lastShots;
-            int hitsThisSecond = Projectile.TotalHits - _lastHits;
+            int hitsThisSecond = WeaponTelemetry.Hit - _lastHits;
             _lastShots = _shots;
-            _lastHits = Projectile.TotalHits;
+            _lastHits = WeaponTelemetry.Hit;
 
             Debug.Log(
                 $"[Diag] zombies={EnemyRegistry.Count} " +
@@ -110,7 +109,9 @@ namespace ScalePunch.Diagnostics
                 $"range={_weapon.Range:0.#}m " +
                 $"target={target} | " +
                 $"shots/s={shotsThisSecond} hits/s={hitsThisSecond} | " +
-                $"totals shots={_shots} hits={Projectile.TotalHits} missed={Projectile.TotalMisses} kills={_kills}");
+                $"totals shots={WeaponTelemetry.Fired} hits={WeaponTelemetry.Hit} " +
+                $"expired={WeaponTelemetry.Expired} wasted={WeaponTelemetry.Wasted} " +
+                $"acc={WeaponTelemetry.Accuracy:P0} kills={_kills}");
         }
     }
 }

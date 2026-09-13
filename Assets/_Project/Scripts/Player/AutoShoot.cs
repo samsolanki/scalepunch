@@ -14,6 +14,8 @@ namespace ScalePunch.Player
     /// no aiming input (docs/01-game-design.md §2).
     /// </summary>
     [RequireComponent(typeof(PlayerStats))]
+    /// <summary>Aims after zombies have moved, before rounds resolve.</summary>
+    [DefaultExecutionOrder(0)]
     public class AutoShoot : MonoBehaviour
     {
         public enum TargetPriority
@@ -42,26 +44,39 @@ namespace ScalePunch.Player
 
         [Header("Targeting")]
         [SerializeField] TargetPriority priority = TargetPriority.Closest;
-        [Tooltip("Degrees per second the turret slews. The gun does not fire until it is on target.")]
-        [SerializeField] float turnSpeed = 720f;
-        [Tooltip("How far off-aim the turret may be and still fire, in degrees. " +
-                 "Keep this small: at 7 m even 12 degrees is about 1.5 m of lateral " +
-                 "error, roughly three times the round's hit radius, so a wide arc " +
-                 "means firing shots that cannot connect.")]
-        [Range(0.5f, 90f)] [SerializeField] float firingArc = 3.5f;
-        [Tooltip("Re-picking a target every frame makes the turret twitch between " +
-                 "equidistant zombies. It holds its target until the target dies or leaves this radius.")]
-        [SerializeField] float targetStickiness = 1.15f;
-
-        [Tooltip("Aim where the target will be when the round arrives, rather than " +
-                 "where it is now. This is how a turret hits a mover without the " +
-                 "rounds visibly curving after it.")]
-        [SerializeField] bool leadTarget = true;
+        [Tooltip("Degrees per second the turret slews. Must exceed the fastest line-of-sight " +
+                 "rate inside the ring, or the turret can never finish its turn and so never " +
+                 "fires. A Runner at 4.5 m/s passing 0.35 m away swings the line at about " +
+                 "740 deg/s, so this has real margin over the worst case.")]
+        [SerializeField] float turnSpeed = 1440f;
+        [Tooltip("Float-comparison noise only — NOT a design tolerance.\n\n" +
+                 "Quaternion.RotateTowards clamps rather than overshoots, so the turret lands " +
+                 "exactly on its target rotation. This exists solely because comparing two " +
+                 "quaternions for equality in floating point needs a hair of slack; it is not " +
+                 "permission to fire while pointing off-target.")]
+        [Range(0.001f, 0.2f)] [SerializeField] float aimEpsilon = 0.01f;
+        [Tooltip("Cap on predicted lead time, in seconds. A target whose intercept is " +
+                 "further out than this is not worth leading — it will have changed " +
+                 "direction by then.")]
+        [SerializeField] float maxLeadSeconds = 1f;
+        [Tooltip("Skip zombies with enough damage already in flight to kill them. " +
+                 "Turning this off makes the turret dump its whole magazine into the " +
+                 "first thing it sees.")]
+        [SerializeField] bool avoidOverkill = true;
+        [Tooltip("Multiplier on the retention radius. Holding the target until it " +
+                 "dies or leaves range is what stops the turret twitching between " +
+                 "equidistant zombies — that alone needs no margin.\n\n" +
+                 "Keep this at 1. Above it, the turret keeps tracking a target that " +
+                 "has drifted past the edge of the ring, and since a round expires " +
+                 "at the ring it can neither hit that target nor pick a closer one: " +
+                 "the gun simply stops firing.")]
+        [Range(1f, 1.5f)] [SerializeField] float targetStickiness = 1f;
 
         [Header("Debug")]
         [SerializeField] bool drawGizmos = true;
 
         float _cooldown;
+        float _muzzleOffset;
         Health _health;
 
         /// <summary>Settable at runtime — the HUD toggle drives this.</summary>
@@ -87,6 +102,13 @@ namespace ScalePunch.Player
         /// <summary>0-1 progress toward the next shot, for UI.</summary>
         public float ReloadProgress { get; private set; }
 
+        /// <summary>Degrees between where the turret points and where it should.
+        /// Zero whenever it has finished its turn. Exposed for diagnostics.</summary>
+        public float AimError { get; private set; }
+
+        /// <summary>True only when the turret is exactly on target.</summary>
+        public bool IsOnTarget { get; private set; }
+
         void Reset()
         {
             stats = GetComponent<PlayerStats>();
@@ -99,6 +121,12 @@ namespace ScalePunch.Player
             if (turret == null) turret = transform;
             if (muzzle == null) muzzle = turret;
             _health = GetComponent<Health>();
+
+            // Ground-plane distance from the pivot to the barrel tip. Constant,
+            // and needed every shot to keep the spawn from overshooting a target
+            // that is closer than the barrel is long.
+            Vector3 local = muzzle.localPosition;
+            _muzzleOffset = new Vector2(local.x, local.z).magnitude;
         }
 
         void Update()
@@ -112,10 +140,10 @@ namespace ScalePunch.Player
             AcquireTarget();
             if (CurrentTarget == null) return;
 
-            bool onTarget = SlewToTarget();
+            bool onTarget = SlewToTarget(Range, out Vector3 aimPoint);
             if (_cooldown > 0f || !onTarget) return;
 
-            Fire();
+            Fire(aimPoint);
             _cooldown = interval;
         }
 
@@ -123,21 +151,44 @@ namespace ScalePunch.Player
         {
             float range = Range;
 
-            // Keep the current target while it is alive and still roughly in
-            // range — the stickiness margin stops the turret oscillating between
-            // two zombies at nearly identical distance.
+            // Keep the current target while it is alive and in range.
+            //
+            // Deliberately NOT dropped for being doomed. Doing that broke exactly
+            // one tier: a Shambler has 5 HP and a round carries 5 damage, so a
+            // single round in the air marked it dead-on-arrival and the turret
+            // stopped tracking it. If that round then missed — separation jitter,
+            // knockback, a slightly stale lead — the Shambler walked in unengaged
+            // until the round expired. Nothing above 5 HP could reproduce it.
             if (CurrentTarget != null && !CurrentTarget.IsDead)
             {
                 float distSqr = (CurrentTarget.transform.position - transform.position).sqrMagnitude;
                 if (distSqr <= range * range * targetStickiness) return;
             }
 
-            CurrentTarget = priority == TargetPriority.Closest
-                ? EnemyRegistry.FindNearest(transform.position, range)
-                : SelectByPriority(range);
+            CurrentTarget = SelectTarget(range);
         }
 
-        Enemy SelectByPriority(float range)
+        bool IsDoomed(Enemy enemy) => avoidOverkill && enemy.IsDoomed;
+
+        /// <summary>
+        /// Prefers a target that is not already dead on arrival, but falls back to
+        /// one that is rather than returning nothing.
+        ///
+        /// Doomed is a preference, not an exclusion. As a hard filter it could
+        /// leave the turret idle with live zombies inside the ring — which is a
+        /// far worse failure than the wasted round it was trying to save.
+        /// </summary>
+        Enemy SelectTarget(float range)
+        {
+            Enemy preferred = Scan(range, skipDoomed: true);
+            return preferred != null ? preferred : Scan(range, skipDoomed: false);
+        }
+
+        /// <summary>
+        /// One scan shared by every priority, so the filter cannot apply to three
+        /// of the four modes and silently not the fourth.
+        /// </summary>
+        Enemy Scan(float range, bool skipDoomed)
         {
             var all = EnemyRegistry.All;
             float rangeSqr = range * range;
@@ -148,6 +199,7 @@ namespace ScalePunch.Player
             {
                 Enemy e = all[i];
                 if (e == null || e.IsDead) continue;
+                if (skipDoomed && IsDoomed(e)) continue;
 
                 float distSqr = (e.transform.position - transform.position).sqrMagnitude;
                 if (distSqr > rangeSqr) continue;
@@ -168,46 +220,83 @@ namespace ScalePunch.Player
         }
 
         /// <summary>
-        /// Where to aim: the target's position plus however far it will travel
-        /// while the round is in the air. Solved twice, because the flight time
-        /// depends on the lead point which depends on the flight time.
+        /// Turns the turret toward where the target is *going to be*, and reports
+        /// whether a shot fired now would actually connect.
+        ///
+        /// Three separate things had to be true for a round to be wasted, and all
+        /// three were:
+        ///
+        /// 1. The turret aimed at the target's current position and left the rest
+        ///    to the round's weak homing. That is pursuit, not interception, and
+        ///    pursuit always trails a crossing target — a Runner at 4.5 m/s moves
+        ///    0.9 m during a 9 m flight, against a 0.55 m hit radius.
+        /// 2. The firing arc was a flat 12 degrees. At 9 m that is 1.9 m of lateral
+        ///    error allowed against a target half a metre wide.
+        /// 3. Target stickiness let a zombie sit 7% beyond the engagement radius
+        ///    while rounds were still given exactly that radius as their range
+        ///    budget — so every shot at a sticky target expired short of it.
         /// </summary>
-        Vector3 AimPoint()
+        bool SlewToTarget(float range, out Vector3 aimPoint)
         {
-            Vector3 position = CurrentTarget.transform.position;
-            if (!leadTarget) return position;
+            // Solved from the turret's pivot, never from the muzzle.
+            //
+            // The muzzle sits 1.16 m out along the barrel and swings on that
+            // radius as the turret turns, while zombies attack from 1.4 m. Once
+            // one closes inside that, the muzzle can end up level with or past it
+            // and the muzzle-to-target vector flips — the turret whips 180 degrees
+            // and the shot leaves backwards. Rotating about the pivot and merely
+            // *spawning* at the barrel tip is how a turret actually works, and it
+            // has no degenerate case.
+            Vector3 origin = turret.position;
+            Vector3 targetPosition = CurrentTarget.transform.position;
+            Vector3 targetVelocity = CurrentTarget.Movement != null
+                ? CurrentTarget.Movement.Velocity
+                : Vector3.zero;
 
             float speed = weapon != null ? weapon.SpeedFor(stats.Stats) : stats.Get(StatType.ProjectileSpeed);
-            if (speed <= 0.01f) return position;
+            aimPoint = Ballistics.Intercept(origin, targetPosition, targetVelocity, speed, maxLeadSeconds);
 
-            Vector3 velocity = CurrentTarget.Movement != null ? CurrentTarget.Movement.Velocity : Vector3.zero;
-            if (velocity.sqrMagnitude < 0.0001f) return position;
+            Vector3 toAim = aimPoint - origin;
+            toAim.y = 0f;
+            if (toAim.sqrMagnitude < 0.0001f) return false;
 
-            Vector3 aim = position;
-            for (int i = 0; i < 2; i++)
-                aim = position + velocity * (Vector3.Distance(muzzle.position, aim) / speed);
+            Quaternion desired = Quaternion.LookRotation(toAim.normalized, Vector3.up);
 
-            return aim;
-        }
-
-        /// <summary>Turns the turret toward the target. Returns true once the
-        /// aim error is inside the firing arc.</summary>
-        bool SlewToTarget()
-        {
-            Vector3 toTarget = AimPoint() - turret.position;
-            toTarget.y = 0f;
-            if (toTarget.sqrMagnitude < 0.0001f) return false;
-
-            Quaternion desired = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+            // RotateTowards clamps to the destination — it never overshoots — so
+            // when the remaining angle fits inside one frame's travel the turret
+            // lands on `desired` exactly. 62 degrees of turn ends at 62, not 61.7
+            // and not 62.4.
             turret.rotation = Quaternion.RotateTowards(
                 turret.rotation, desired, turnSpeed * Time.deltaTime);
 
-            return Quaternion.Angle(turret.rotation, desired) <= firingArc;
+            AimError = Quaternion.Angle(turret.rotation, desired);
+            IsOnTarget = AimError <= aimEpsilon;
+
+            // Out of range: no shot exists that could reach, so hold fire and
+            // keep tracking.
+            float distance = toAim.magnitude;
+            if (distance > range) return false;
+
+            // Exactly on target, or not firing.
+            //
+            // This used to permit the target's angular size PLUS half of what the
+            // round could steer out in flight — about 7 degrees at 9 m. That is
+            // firing while visibly not pointing at the zombie and trusting the
+            // bullet to fix it. The turn rate is high enough to finish the turn
+            // inside a frame or two at any range in the ring, so the only thing
+            // that slack ever bought was shooting sooner and wronger.
+            return IsOnTarget;
         }
 
-        void Fire()
+        void Fire(Vector3 aimPoint)
         {
             if (weapon == null || !ProjectileService.Exists) return;
+
+            // Belt and braces. Update() already returns on a null target, but a
+            // round launched without one can never be guaranteed to hit, so the
+            // guarantee is only worth anything if this is impossible rather than
+            // merely unlikely.
+            if (CurrentTarget == null || CurrentTarget.IsDead) return;
 
             StatSheet sheet = stats.Stats;
 
@@ -217,8 +306,26 @@ namespace ScalePunch.Player
             int pierce = Mathf.RoundToInt(sheet.Get(StatType.Pierce));
             int rounds = RoundsThisShot(sheet);
 
-            Vector3 origin = muzzle.position;
-            Vector3 aim = turret.forward;
+            Vector3 pivot = turret.position;
+
+            Vector3 toAim = aimPoint - pivot;
+            toAim.y = 0f;
+            float aimDistance = toAim.magnitude;
+            Vector3 aim = aimDistance < 0.0001f ? turret.forward : toAim / aimDistance;
+
+            // The barrel is 1.16 m long. Spawning at its tip puts the round PAST
+            // anything closer than that — a zombie at 0.1 m ends up 1.06 m behind
+            // the round, which then flies away from it, spends its whole range
+            // turning around, and expires. Measured at 13% hits inside 1 m against
+            // 76% further out.
+            //
+            // So the spawn slides down the barrel as the target closes, and never
+            // passes the halfway point to it. At normal range this is the barrel
+            // tip exactly; at knife range the round leaves from the chest.
+            float spawnAlong = Mathf.Min(_muzzleOffset, aimDistance * 0.5f);
+
+            Vector3 origin = pivot + aim * spawnAlong;
+            origin.y = muzzle.position.y;
 
             for (int i = 0; i < rounds; i++)
             {
