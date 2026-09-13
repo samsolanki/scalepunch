@@ -23,23 +23,11 @@ MonoBehaviour:
     damageMultiplier: 1.2
     radius: 4
     targets: 0
-  - description: Blast 150% damage in 4.5 m, every 5.5 s
-    modifiers: []
-    cooldown: 5.5
-    damageMultiplier: 1.5
-    radius: 4.5
-    targets: 0
   - description: Blast 180% damage in 5 m, every 5 s
     modifiers: []
     cooldown: 5
     damageMultiplier: 1.8
     radius: 5
-    targets: 0
-  - description: Blast 210% damage in 5.5 m, every 4.5 s
-    modifiers: []
-    cooldown: 4.5
-    damageMultiplier: 2.1
-    radius: 5.5
     targets: 0
   - description: Blast 250% damage in 6 m, every 4 s
     modifiers: []

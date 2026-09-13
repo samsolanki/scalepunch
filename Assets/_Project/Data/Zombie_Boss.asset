@@ -10,21 +10,21 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2ba7fbb6b32411f44be36350b28d2d65, type: 3}
-  m_Name: Zombie_Brute
+  m_Name: Zombie_Boss
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Enemies.EnemyDefinition
-  id: brute
-  prefab: {fileID: 630060368282572915, guid: 5d711c013d282ae43b260066b782e65d, type: 3}
-  baseHP: 30
-  baseDamage: 18
-  moveSpeed: 1.4
-  attackRange: 1.4
-  attackInterval: 1
+  id: boss
+  prefab: {fileID: 4634302692253920878, guid: a87f4fc4ab663f34fa86510ff755b6d3, type: 3}
+  baseHP: 200
+  baseDamage: 22
+  moveSpeed: 1.6
+  attackRange: 2
+  attackInterval: 1.4
   armor: 0
   standoffGap: 0.6
   behaviour: 2
   knockbackResistance: 1
   hpGrowthPerWave: 1
   damageGrowthPerWave: 1
-  xpValue: 4
+  xpValue: 40
   tint: {r: 1, g: 1, b: 1, a: 1}
-  scale: 1.45
+  scale: 2.2

@@ -15,7 +15,7 @@ MonoBehaviour:
   id: pistol
   displayName: Pistol
   projectilePrefab: {fileID: 4985256397632180213, guid: 4b84a18cc8fa62d4ba4b5b7f68919b70, type: 3}
-  hitRadius: 0.55
+  hitRadius: 0.12
   lifetime: 2.5
   damageMultiplier: 1
   fireRateMultiplier: 1
@@ -24,4 +24,6 @@ MonoBehaviour:
   extraProjectiles: 0
   spreadDegrees: 0
   inaccuracyDegrees: 1
-  steerDegreesPerSecond: 45
+  guaranteedHit: 1
+  lockOnDegreesPerSecond: 720
+  steerDegreesPerSecond: 35

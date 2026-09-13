@@ -121,12 +121,29 @@ namespace ScalePunch.Enemies
             _knockbackVelocity += direction.normalized * resisted;
         }
 
+        static bool IsFinite(Vector3 v) =>
+            !(float.IsNaN(v.x) || float.IsNaN(v.y) || float.IsNaN(v.z) ||
+              float.IsInfinity(v.x) || float.IsInfinity(v.y) || float.IsInfinity(v.z));
+
         void Update()
         {
             if (_definition == null || _target == null) return;
             if (ExternalControl) return;
 
             float dt = Time.deltaTime;
+
+            // timeScale is exactly 0 while the level-up draft holds the game, so
+            // the frame delta below would be a divide by zero. That matters more
+            // than it looks: Vector3.Lerp computes a + (b - a) * t, so a single
+            // NaN frameVelocity poisons Velocity permanently - t = 0 does not
+            // discard it, and every later Lerp carries the NaN forward. The
+            // turret then leads on a NaN intercept and both its aim and its
+            // rounds go wild until that zombie happens to die and a pooled
+            // replacement resets the field.
+            //
+            // Hitstop is unaffected either way: it sets timeScale to 0.05, not 0.
+            if (dt <= 0f) return;
+
             Vector3 position = transform.position;
 
             Vector3 toTarget = _target.position - position;
@@ -171,7 +188,12 @@ namespace ScalePunch.Enemies
             // ~5 frame smoothing. Enough to shrug off separation jitter, short
             // enough that a Runner changing direction is tracked within a few
             // frames rather than half a second.
-            Velocity = Vector3.Lerp(Velocity, frameVelocity, 1f - Mathf.Exp(-12f * dt));
+            Vector3 smoothed = Vector3.Lerp(Velocity, frameVelocity, 1f - Mathf.Exp(-12f * dt));
+
+            // Belt and braces against the same class of fault. A NaN here is
+            // self-perpetuating and silently corrupts aiming for every shot at
+            // this target, so it is worth never letting one survive a frame.
+            Velocity = IsFinite(smoothed) ? smoothed : Vector3.zero;
 
             transform.position = position;
 

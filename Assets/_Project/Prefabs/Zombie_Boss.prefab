@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &3717223878015848263
+--- !u!1 &2322990968557134440
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,9 +8,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 2262408808149386791}
-  - component: {fileID: 52513081208828217}
-  - component: {fileID: 5607743714047317521}
+  - component: {fileID: 8978879137037790321}
+  - component: {fileID: 245987386995311774}
+  - component: {fileID: 194200550491220572}
   m_Layer: 0
   m_Name: Body
   m_TagString: Untagged
@@ -18,36 +18,36 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &2262408808149386791
+--- !u!4 &8978879137037790321
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3717223878015848263}
+  m_GameObject: {fileID: 2322990968557134440}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 1, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1506383004821950875}
+  m_Father: {fileID: 8656436264310099859}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &52513081208828217
+--- !u!33 &245987386995311774
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3717223878015848263}
+  m_GameObject: {fileID: 2322990968557134440}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &5607743714047317521
+--- !u!23 &194200550491220572
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3717223878015848263}
+  m_GameObject: {fileID: 2322990968557134440}
   m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
@@ -66,7 +66,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: e49c387ca6e1c184593cab58606e6d7a, type: 2}
+  - {fileID: 2100000, guid: 8efe7c2b78f35a4419018874a179790b, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -90,7 +90,7 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &6785874861401915935
+--- !u!1 &8077489199856481777
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -98,44 +98,45 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1506383004821950875}
-  - component: {fileID: 3015487660837035368}
-  - component: {fileID: 2451725792830794452}
-  - component: {fileID: 630060368282572915}
-  - component: {fileID: 442011969356450961}
-  - component: {fileID: 2942953488504350387}
-  - component: {fileID: 3383845470245234864}
-  - component: {fileID: 9182469064648167327}
+  - component: {fileID: 8656436264310099859}
+  - component: {fileID: 1382419660833749170}
+  - component: {fileID: 1793256218814076511}
+  - component: {fileID: 4634302692253920878}
+  - component: {fileID: 3921270309025386669}
+  - component: {fileID: 4567137163614269329}
+  - component: {fileID: 1911303156205391901}
+  - component: {fileID: 2431935781715378484}
+  - component: {fileID: 5304004007429725916}
   m_Layer: 0
-  m_Name: Zombie
+  m_Name: Zombie_Boss
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1506383004821950875
+--- !u!4 &8656436264310099859
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6785874861401915935}
+  m_GameObject: {fileID: 8077489199856481777}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 2262408808149386791}
+  - {fileID: 8978879137037790321}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &3015487660837035368
+--- !u!114 &1382419660833749170
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6785874861401915935}
+  m_GameObject: {fileID: 8077489199856481777}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 741f8c7c9fea159428319a9957d68684, type: 3}
@@ -143,13 +144,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Combat.Health
   maxHP: 100
   armor: 0
---- !u!114 &2451725792830794452
+--- !u!114 &1793256218814076511
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6785874861401915935}
+  m_GameObject: {fileID: 8077489199856481777}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7dfdb8c7e3720b64f996a744d28932d1, type: 3}
@@ -159,29 +160,29 @@ MonoBehaviour:
   separationStrength: 2.5
   separationSamples: 8
   playerRadius: 0.5
-  attackReach: 0.2
+  attackReach: 0.3
   knockbackDecay: 9
---- !u!114 &630060368282572915
+--- !u!114 &4634302692253920878
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6785874861401915935}
+  m_GameObject: {fileID: 8077489199856481777}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 66304968844214a49bd726e38e9b7b77, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Enemies.Enemy
-  health: {fileID: 3015487660837035368}
-  movement: {fileID: 2451725792830794452}
---- !u!114 &442011969356450961
+  health: {fileID: 1382419660833749170}
+  movement: {fileID: 1793256218814076511}
+--- !u!114 &3921270309025386669
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6785874861401915935}
+  m_GameObject: {fileID: 8077489199856481777}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2e5ce431a1e19ee49beb8249d08ca04e, type: 3}
@@ -189,55 +190,84 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Feedback.HitFlash
   tuning: {fileID: 11400000, guid: 53e6a46bc95754949904bd13ccf2d769, type: 2}
   renderers:
-  - {fileID: 5607743714047317521}
---- !u!114 &2942953488504350387
+  - {fileID: 194200550491220572}
+--- !u!114 &4567137163614269329
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6785874861401915935}
+  m_GameObject: {fileID: 8077489199856481777}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0ab95a4970d869d4c8aa43107f44698e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Feedback.CombatFeedback
   tuning: {fileID: 11400000, guid: 53e6a46bc95754949904bd13ccf2d769, type: 2}
-  health: {fileID: 3015487660837035368}
-  flash: {fileID: 442011969356450961}
-  movement: {fileID: 2451725792830794452}
-  numberHeight: 1.7
---- !u!114 &3383845470245234864
+  health: {fileID: 1382419660833749170}
+  flash: {fileID: 3921270309025386669}
+  movement: {fileID: 1793256218814076511}
+  numberHeight: 3
+--- !u!114 &1911303156205391901
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6785874861401915935}
+  m_GameObject: {fileID: 8077489199856481777}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b57d4f8a4dcd02c4bba6ec1296fac6b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Feedback.HitFlinch
-  health: {fileID: 3015487660837035368}
-  body: {fileID: 2262408808149386791}
-  tiltDegrees: 24
-  critTiltDegrees: 38
-  recoverSpeed: 7
---- !u!114 &9182469064648167327
+  health: {fileID: 1382419660833749170}
+  body: {fileID: 8978879137037790321}
+  tiltDegrees: 10
+  critTiltDegrees: 16
+  recoverSpeed: 6
+--- !u!114 &2431935781715378484
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6785874861401915935}
+  m_GameObject: {fileID: 8077489199856481777}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 62acf74ca9fe60847bf920be4588e169, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Combat.HealthBarTarget
-  health: {fileID: 3015487660837035368}
-  heightOffset: 2.1
-  width: 90
-  hideWhenFull: 1
-  priority: 0
+  health: {fileID: 1382419660833749170}
+  heightOffset: 3.4
+  width: 200
+  hideWhenFull: 0
+  priority: 100
+--- !u!114 &5304004007429725916
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8077489199856481777}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2eda9453e9805940957a2a978c75488, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Enemies.BossController
+  enemy: {fileID: 4634302692253920878}
+  movement: {fileID: 1793256218814076511}
+  health: {fileID: 1382419660833749170}
+  body: {fileID: 8978879137037790321}
+  phaseTwoAt: 0.5
+  phaseTwoSpeedMultiplier: 1.45
+  phaseTwoDamageMultiplier: 1.35
+  phaseTwoChargeIntervalScale: 0.6
+  chargeInterval: 8
+  telegraphSeconds: 1.2
+  chargeSpeed: 15
+  chargeSeconds: 0.75
+  chargeDamage: 34
+  chargeHitRadius: 1.6
+  recoverSeconds: 0.9
+  telegraphScale: 1.25
+  telegraphPulseSpeed: 14

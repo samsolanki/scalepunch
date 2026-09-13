@@ -20,8 +20,11 @@ MonoBehaviour:
   attackRange: 1.4
   attackInterval: 1
   armor: 0
+  standoffGap: 0.6
   behaviour: 0
   knockbackResistance: 0
+  hpGrowthPerWave: 1
+  damageGrowthPerWave: 1
   xpValue: 1
   tint: {r: 1, g: 1, b: 1, a: 1}
   scale: 1

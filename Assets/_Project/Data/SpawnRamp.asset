@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5af7d62bf6c79d4082b864e3b34aa3e, type: 3}
+  m_Name: SpawnRamp
+  m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Stages.SpawnRamp
+  tiers:
+  - enemy: {fileID: 11400000, guid: c3a88b215b3ea414facdbe641e5ce4c3, type: 2}
+    isBaseline: 1
+    firstWave: 1
+    rampEndWave: 10
+    shareAtFirstWave: 0.4
+    shareAtRampEnd: 0.5
+  - enemy: {fileID: 11400000, guid: 4ef4c3f6e2c012948b2482a2bb5f3773, type: 2}
+    isBaseline: 0
+    firstWave: 3
+    rampEndWave: 10
+    shareAtFirstWave: 0.4
+    shareAtRampEnd: 0.5
+  - enemy: {fileID: 11400000, guid: 0c5b9e5e2f8a1fd42b335dbcff920c4b, type: 2}
+    isBaseline: 0
+    firstWave: 6
+    rampEndWave: 15
+    shareAtFirstWave: 0.08
+    shareAtRampEnd: 0.25
+  baselineMinimumShare: 0.2
+  intervalAtWave1: 1.4
+  intervalAtRampEnd: 0.35
+  intervalRampEndWave: 15
+  minimumInterval: 0.25
+  burstStartWave: 15
+  burstAtStart: 1
+  burstAtRampEnd: 3
+  burstRampEndWave: 25

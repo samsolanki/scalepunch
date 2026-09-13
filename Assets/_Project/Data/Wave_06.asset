@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d02f4d9b78420443ab18b88e7324319, type: 3}
+  m_Name: Wave_06
+  m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Stages.WaveDefinition
+  displayName: Breach
+  duration: 30
+  entries:
+  - enemy: {fileID: 11400000, guid: 4ef4c3f6e2c012948b2482a2bb5f3773, type: 2}
+    timeOffset: 0
+    count: 12
+    pattern: 2
+    spreadSeconds: 5
+    arcDegrees: 90
+  - enemy: {fileID: 11400000, guid: c3a88b215b3ea414facdbe641e5ce4c3, type: 2}
+    timeOffset: 6
+    count: 12
+    pattern: 1
+    spreadSeconds: 8
+    arcDegrees: 50
+  - enemy: {fileID: 11400000, guid: 0c5b9e5e2f8a1fd42b335dbcff920c4b, type: 2}
+    timeOffset: 18
+    count: 2
+    pattern: 2
+    spreadSeconds: 1
+    arcDegrees: 90

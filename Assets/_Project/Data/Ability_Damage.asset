@@ -44,26 +44,8 @@ MonoBehaviour:
     damageMultiplier: 1
     radius: 3
     targets: 3
-  - description: +15% damage
-    modifiers:
-    - stat: 1
-      kind: 1
-      value: 0.15
-    cooldown: 5
-    damageMultiplier: 1
-    radius: 3
-    targets: 3
-  - description: +15% damage
-    modifiers:
-    - stat: 1
-      kind: 1
-      value: 0.15
-    cooldown: 5
-    damageMultiplier: 1
-    radius: 3
-    targets: 3
   effect: {fileID: 0}
-  draftWeight: 1.2
+  draftWeight: 1
   evolvesInto: {fileID: 0}
   evolutionRequires: {fileID: 0}
   isEvolution: 0

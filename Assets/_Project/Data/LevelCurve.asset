@@ -12,6 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82e83ce6765f3434b9f497bee9df76cf, type: 3}
   m_Name: LevelCurve
   m_EditorClassIdentifier: Assembly-CSharp::ScalePunch.Progression.LevelCurve
+  source: 0
+  cumulativeThresholds: 050000000f0000001e000000320000004b000000690000008c000000b4000000e100000013010000
   flat: 5
   linear: 8
   quadratic: 0.5
