@@ -19,6 +19,13 @@ namespace ScalePunch.Enemies
         [Tooltip("Enemies checked per frame for separation. Sampling a slice keeps this O(k), not O(n²).")]
         [SerializeField] int separationSamples = 8;
 
+        [Header("Standoff")]
+        [Tooltip("Ground-plane radius of the player's body. The stop distance is this " +
+                 "plus the zombie's own radius plus its standoff gap.")]
+        [SerializeField] float playerRadius = 0.5f;
+        [Tooltip("Extra reach past the standoff ring within which the zombie can swing.")]
+        [SerializeField] float attackReach = 0.2f;
+
         [Header("Knockback")]
         [SerializeField] float knockbackDecay = 9f;
 
@@ -47,6 +54,16 @@ namespace ScalePunch.Enemies
         public float Damage => _damage;
 
         /// <summary>
+        /// How close this zombie may get, centre to centre.
+        ///
+        /// Derived rather than a flat number, so every tier stops with the same
+        /// visible gap: a Boss at 2.2 scale carries a 1.1 m body and stands
+        /// further out than a Runner instead of clipping halfway through
+        /// the player.
+        /// </summary>
+        public float StopDistance { get; private set; } = 1f;
+
+        /// <summary>
         /// Smoothed ground-plane velocity, for the turret's intercept solve.
         ///
         /// Smoothed rather than raw: a single frame's delta spikes hard during
@@ -59,6 +76,10 @@ namespace ScalePunch.Enemies
         {
             _definition = definition;
             _damage = damage;
+
+            // 0.5 is Unity's capsule radius at scale 1.
+            float bodyRadius = 0.5f * Mathf.Max(0.01f, definition.scale);
+            StopDistance = playerRadius + bodyRadius + Mathf.Max(0f, definition.standoffGap);
             _baseDamage = damage;
             _speedMultiplier = 1f;
             _target = target;
@@ -119,11 +140,29 @@ namespace ScalePunch.Enemies
                 _knockbackVelocity = Vector3.MoveTowards(
                     _knockbackVelocity, Vector3.zero, knockbackDecay * dt);
             }
-            else if (distance > _definition.attackRange)
+            else if (distance > StopDistance)
             {
                 Vector3 step = toTarget.normalized * (_definition.moveSpeed * _speedMultiplier * dt);
                 position += step + Separation() * (separationStrength * dt);
             }
+            else
+            {
+                // On the ring already: still spread sideways against neighbours,
+                // but never advance. Without this the back of a crowd keeps
+                // pushing and the front rank is driven through the player.
+                position += Separation() * (separationStrength * dt);
+            }
+
+            // Hard clamp, applied after everything — pursuit, separation and
+            // knockback alike.
+            //
+            // Separation pushes a zombie away from its neighbours, and in a crowd
+            // pressed against the player the only free direction is straight
+            // through them. That is how a dozen zombies ended up stacked at 0.1 m,
+            // inside the body they were supposed to be attacking. A condition on
+            // the pursuit step cannot prevent it; only a clamp on the final
+            // position can.
+            position = ClampOutside(position, _target.position, StopDistance);
 
             Vector3 frameVelocity = (position - _lastPosition) / dt;
             frameVelocity.y = 0f;
@@ -142,10 +181,29 @@ namespace ScalePunch.Enemies
             TickAttack(dt, distance);
         }
 
+        /// <summary>Pushes a position back out to the standoff ring if it has
+        /// crossed inside it, keeping its bearing.</summary>
+        static Vector3 ClampOutside(Vector3 position, Vector3 centre, float minDistance)
+        {
+            Vector3 offset = position - centre;
+            float height = offset.y;
+            offset.y = 0f;
+
+            float distance = offset.magnitude;
+            if (distance >= minDistance) return position;
+
+            // Exactly on top: pick an arbitrary bearing rather than divide by zero.
+            Vector3 bearing = distance < 0.0001f ? Vector3.forward : offset / distance;
+
+            Vector3 pushed = centre + bearing * minDistance;
+            pushed.y = centre.y + height;
+            return pushed;
+        }
+
         void TickAttack(float dt, float distance)
         {
             _attackTimer -= dt;
-            if (distance > _definition.attackRange) return;
+            if (distance > StopDistance + attackReach) return;
             if (_attackTimer > 0f) return;
             if (_targetHealth == null || _targetHealth.IsDead) return;
 

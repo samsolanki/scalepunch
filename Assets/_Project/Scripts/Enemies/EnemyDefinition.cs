@@ -32,6 +32,13 @@ namespace ScalePunch.Enemies
                  "many-small-hits builds specifically.")]
         public float armor;
 
+        [Tooltip("Clear space kept between this zombie's body and the player's. The " +
+                 "zombie stops here and attacks from arm's length.\n\n" +
+                 "The stop distance is derived — player radius + this zombie's body " +
+                 "radius + this gap — so a Boss at 2.2 scale naturally stands further " +
+                 "out than a Runner rather than clipping through.")]
+        public float standoffGap = 0.15f;
+
         [Header("Behaviour")]
         public EnemyBehaviour behaviour = EnemyBehaviour.Shambler;
         [Tooltip("1 = immune. Brutes should ignore bullet knockback entirely, or " +

@@ -212,6 +212,9 @@ namespace ScalePunch.EditorTools
             Set(enemy, "health", health);
             Set(enemy, "movement", movement);
 
+            Set(movement, "playerRadius", 0.5f);
+            Set(movement, "attackReach", 0.2f);
+
             Set(flash, "tuning", data.tuning);
             SetArray(flash, "renderers", new Object[] { body.GetComponent<Renderer>() });
 
@@ -264,6 +267,9 @@ namespace ScalePunch.EditorTools
 
             Set(enemy, "health", health);
             Set(enemy, "movement", movement);
+
+            Set(movement, "playerRadius", 0.5f);
+            Set(movement, "attackReach", 0.3f);
 
             Set(flash, "tuning", data.tuning);
             SetArray(flash, "renderers", new Object[] { body.GetComponent<Renderer>() });
