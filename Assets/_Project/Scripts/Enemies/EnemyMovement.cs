@@ -28,6 +28,21 @@ namespace ScalePunch.Enemies
 
         [Header("Knockback")]
         [SerializeField] float knockbackDecay = 9f;
+        [Tooltip("Knockback speed at which pursuit is fully suppressed. Below it, " +
+                 "walking fades back in proportionally instead of snapping on.")]
+        [SerializeField] float knockbackOverrideSpeed = 2.5f;
+
+        [Header("Smoothing")]
+        [Tooltip("Metres per second squared. Zombies ease up to speed instead of " +
+                 "starting at full pace the frame they spawn or stop being shoved.")]
+        [SerializeField] float acceleration = 14f;
+        [Tooltip("How fast the separation push follows its sampled value. The raw " +
+                 "sampler reads a different slice of neighbours every frame, so its " +
+                 "output is discontinuous by construction; this is what turns that " +
+                 "into a steady drift rather than a shudder.")]
+        [SerializeField] float separationSmoothing = 10f;
+        [Tooltip("Degrees per second the body turns to face the player.")]
+        [SerializeField] float turnSpeed = 540f;
 
         EnemyDefinition _definition;
         Transform _target;
@@ -37,6 +52,8 @@ namespace ScalePunch.Enemies
         float _speedMultiplier = 1f;
         float _attackTimer;
         Vector3 _knockbackVelocity;
+        Vector3 _walkVelocity;
+        Vector3 _separation;
         Vector3 _lastPosition;
         int _separationCursor;
 
@@ -87,6 +104,8 @@ namespace ScalePunch.Enemies
             _targetHealth = target != null ? target.GetComponent<Health>() : null;
             _attackTimer = 0f;
             _knockbackVelocity = Vector3.zero;
+            _walkVelocity = Vector3.zero;
+            _separation = Vector3.zero;
             _lastPosition = transform.position;
             Velocity = Vector3.zero;
             ExternalControl = false;
@@ -150,25 +169,36 @@ namespace ScalePunch.Enemies
             toTarget.y = 0f;
             float distance = toTarget.magnitude;
 
-            // Knockback overrides pursuit while it is still meaningful.
-            if (_knockbackVelocity.sqrMagnitude > 0.01f)
-            {
-                position += _knockbackVelocity * dt;
-                _knockbackVelocity = Vector3.MoveTowards(
-                    _knockbackVelocity, Vector3.zero, knockbackDecay * dt);
-            }
-            else if (distance > StopDistance)
-            {
-                Vector3 step = toTarget.normalized * (_definition.moveSpeed * _speedMultiplier * dt);
-                position += step + Separation() * (separationStrength * dt);
-            }
-            else
-            {
-                // On the ring already: still spread sideways against neighbours,
-                // but never advance. Without this the back of a crowd keeps
-                // pushing and the front rank is driven through the player.
-                position += Separation() * (separationStrength * dt);
-            }
+            // Separation, low-passed. The sampler walks a rotating slice of
+            // neighbours to stay O(k) rather than O(n squared), which means its
+            // raw output changes discontinuously every frame even when nobody has
+            // moved. Smoothing it is what turns that sampling artefact into a
+            // steady drift instead of a shudder.
+            _separation = Vector3.Lerp(_separation, Separation(),
+                                       1f - Mathf.Exp(-separationSmoothing * dt));
+
+            // Pursuit, accelerated rather than instant. Desired speed drops to
+            // zero once inside the standoff ring, so arriving is a decelerating
+            // approach instead of a dead stop mid-stride.
+            Vector3 desired = distance > StopDistance
+                ? toTarget / Mathf.Max(distance, 0.0001f) * (_definition.moveSpeed * _speedMultiplier)
+                : Vector3.zero;
+
+            _walkVelocity = Vector3.MoveTowards(_walkVelocity, desired, acceleration * dt);
+
+            // Knockback crossfades with pursuit rather than replacing it. The old
+            // hard switch put a visible hitch at its threshold: a zombie stopped
+            // dead the instant knockback decayed past 0.01, then resumed at full
+            // walking speed on the next frame.
+            float pursuit = 1f - Mathf.Clamp01(
+                _knockbackVelocity.magnitude / Mathf.Max(0.01f, knockbackOverrideSpeed));
+
+            position += (_walkVelocity * pursuit
+                         + _separation * separationStrength
+                         + _knockbackVelocity) * dt;
+
+            _knockbackVelocity = Vector3.MoveTowards(
+                _knockbackVelocity, Vector3.zero, knockbackDecay * dt);
 
             // Hard clamp, applied after everything — pursuit, separation and
             // knockback alike.
@@ -197,8 +227,15 @@ namespace ScalePunch.Enemies
 
             transform.position = position;
 
+            // Turned at a rate, not snapped. Separation shoves a zombie sideways
+            // constantly in a crowd, and reassigning the rotation outright each
+            // frame made the whole pack twitch in place.
             if (distance > 0.01f)
-                transform.rotation = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+            {
+                Quaternion facing = Quaternion.LookRotation(toTarget / distance, Vector3.up);
+                transform.rotation = Quaternion.RotateTowards(
+                    transform.rotation, facing, turnSpeed * dt);
+            }
 
             TickAttack(dt, distance);
         }
