@@ -587,6 +587,31 @@ namespace ScalePunch.EditorTools
 
         // ----------------------------------------------------------- abilities
 
+        /// <summary>Fire-rate percent, per draft level. Additive on the rate, not
+        /// on the delay: subtracting a flat percentage from the delay each time
+        /// compounds toward zero and five picks would leave the gun firing four
+        /// times faster. Stacking on the rate gives the same first pick and
+        /// tapers on its own.</summary>
+        const float FireRatePerLevel = 0.25f;
+
+        /// <summary>
+        /// Describes a fire-rate level by the delay it actually buys, because
+        /// "+25% fire rate" is not a number anyone can feel. Computed from
+        /// StatSheet.BaseFireRate so the card text cannot drift from the gun.
+        /// </summary>
+        static string[] FireDelayText(int levels)
+        {
+            var text = new string[levels];
+
+            for (int i = 0; i < levels; i++)
+            {
+                float before = StatSheet.BaseFireRate * (1f + FireRatePerLevel * i);
+                float after = StatSheet.BaseFireRate * (1f + FireRatePerLevel * (i + 1));
+                text[i] = $"{1f / before:0.00}s → {1f / after:0.00}s between shots";
+            }
+            return text;
+        }
+
         static AbilityLevel[] NewLevels(int count)
         {
             var levels = new AbilityLevel[count];
@@ -621,9 +646,15 @@ namespace ScalePunch.EditorTools
             return def;
         }
 
+        /// <summary>
+        /// <paramref name="perLevelText"/> overrides the generated line when a
+        /// level needs to say something the raw modifier cannot - a rate upgrade
+        /// stated as the delay it actually buys, for instance.
+        /// </summary>
         static AbilityDefinition Passive(string file, string display, StatType stat,
                                          ModifierKind kind, float perLevel, int levelCount,
-                                         float weight, string unitLabel)
+                                         float weight, string unitLabel,
+                                         string[] perLevelText = null)
         {
             AbilityDefinition def = Asset<AbilityDefinition>(file);
 
@@ -640,7 +671,8 @@ namespace ScalePunch.EditorTools
 
             for (int i = 0; i < def.levels.Length; i++)
             {
-                def.levels[i].description = text;
+                def.levels[i].description =
+                    perLevelText != null && i < perLevelText.Length ? perLevelText[i] : text;
                 def.levels[i].modifiers = new[]
                 {
                     new StatModifier { stat = stat, kind = kind, value = perLevel }
@@ -704,7 +736,7 @@ namespace ScalePunch.EditorTools
                 1.0f),
 
             Passive("Ability_Damage",   "Heavy Rounds", StatType.Damage,   ModifierKind.Percent, 0.15f, 3, 1.0f, "damage"),
-            Passive("Ability_FireRate", "Trigger Work", StatType.FireRate, ModifierKind.Percent, 0.12f, 3, 1.0f, "fire rate")
+            Passive("Ability_FireRate", "Trigger Work", StatType.FireRate, ModifierKind.Percent, FireRatePerLevel, 3, 1.0f, "fire rate", FireDelayText(3))
         };
 
         static List<AbilityDefinition> FullRoster(RadialBurstEffect burst, GrenadeEffect grenade,
@@ -756,7 +788,7 @@ namespace ScalePunch.EditorTools
                     1.0f),
 
                 Passive("Ability_Damage",    "Heavy Rounds", StatType.Damage,          ModifierKind.Percent, 0.15f, 5, 1.2f, "damage"),
-                Passive("Ability_FireRate",  "Trigger Work", StatType.FireRate,        ModifierKind.Percent, 0.12f, 5, 1.2f, "fire rate"),
+                Passive("Ability_FireRate",  "Trigger Work", StatType.FireRate,        ModifierKind.Percent, FireRatePerLevel, 5, 1.2f, "fire rate", FireDelayText(5)),
                 Passive("Ability_Pierce",    "Penetrator",   StatType.Pierce,          ModifierKind.Flat,    1f,    5, 0.9f, "pierce"),
                 Passive("Ability_Multishot", "Split Barrel", StatType.ProjectileCount, ModifierKind.Flat,    0.5f,  5, 0.7f, "rounds per shot"),
 

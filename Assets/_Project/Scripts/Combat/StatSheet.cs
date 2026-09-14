@@ -28,6 +28,20 @@ namespace ScalePunch.Combat
         /// </summary>
         public const float BaseDamage = 5f;
 
+        /// <summary>
+        /// Shots per second before upgrades, so the delay between one shot and
+        /// the next is 1/this - 0.63 s at 1.6.
+        ///
+        /// Deliberately slow enough to see. At 3/sec the gun read as a continuous
+        /// stream and a fire-rate upgrade was invisible: you cannot perceive a
+        /// 12% change to a third of a second. A gap you can watch close is what
+        /// makes that upgrade worth drafting.
+        ///
+        /// RunSceneBuilder reads this constant to write the ability text, so the
+        /// numbers on the cards cannot drift from the real interval.
+        /// </summary>
+        public const float BaseFireRate = 1.6f;
+
         [SerializeField]
         BaseValue[] baseValues =
         {
@@ -35,7 +49,7 @@ namespace ScalePunch.Combat
             // One bullet, one Shambler - the clearest possible read on whether
             // the gun is working.
             new() { stat = StatType.Damage,          value = BaseDamage },
-            new() { stat = StatType.FireRate,        value = 3.0f },
+            new() { stat = StatType.FireRate,        value = BaseFireRate },
             new() { stat = StatType.Range,           value = 9.0f },
             new() { stat = StatType.CritChance,      value = 0.05f },
             new() { stat = StatType.CritMultiplier,  value = 2.0f },
